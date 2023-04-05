@@ -1,28 +1,8 @@
 #pragma once
-#include <stdio.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <error.h>
-#include <sys/socket.h> //基本套接字定义
-#include <sys/types.h>  //基本系统数据类型
-#include <sys/time.h>   //select调用超时值结构体
-#include <netinet/in.h> //sockaddr_in及其他网络定义
-#include <arpa/inet.h>  //inet(3)函数
-#include <fcntl.h>      //设置非阻塞
-#include <unistd.h>
-#include <signal.h>
 #include <pthread.h>
-#include <vector>
-#include <map>
-#include <string>
-#include <string.h>
+#include "../common.h"
 
 #define LISTENQ 1024
-#define SERV_PORT 12345
-
-#define ERR(exp, msg) if(exp) {error(1, errno, msg);}
-#define STR(str) #str
-#define CLS system("clear");
 
 //创建监听套接字
 int server_listen(int port);
@@ -32,10 +12,12 @@ void server_set_nonblocking(int fd);
 void server_show_menu();
 //服务器子线程处理函数
 void* server_thread(void* arg);
+//子线程对收到包的处理
+void server_handle(int res, clipkt &p, srvpkt &spkt);
 
 #pragma region 自定义类型
 
-enum estate : uint8_t
+enum class estate : uint8_t
 {
     login = 0x00,
     game
@@ -44,26 +26,21 @@ enum estate : uint8_t
 struct state
 {
     estate st;
+    int gid;
+    state() : st(estate::login) {}
+    void join_game(int g) {st = estate::game; gid = g;}
     const char* to_string()
     {
         switch (st)
         {
-        case login:
+        case estate::login:
             return STR(login);
-        case game:
+        case estate::game:
             return STR(game);
         default:
             return STR(unknown);
         }
     }
-};
-
-//用户出拳
-enum answer : uint8_t
-{
-    rock = 0x00,
-    paper,
-    scissors
 };
 
 //对局内用户信息
@@ -90,9 +67,9 @@ struct gameinfo
     void end_round()
     {
         if (p1.ans == p2.ans) {}
-        else if (p1.ans == rock && p2.ans == scissors) p1.score++;
-        else if (p1.ans == paper && p2.ans == rock) p1.score++;
-        else if (p1.ans == scissors && p2.ans == paper) p1.score++;
+        else if (p1.ans == answer::rock && p2.ans == answer::scissors) p1.score++;
+        else if (p1.ans == answer::paper && p2.ans == answer::rock) p1.score++;
+        else if (p1.ans == answer::scissors && p2.ans == answer::paper) p1.score++;
         else p2.score++;
         round++;
     }
@@ -135,3 +112,9 @@ extern std::map<std::string, state> ulist;
 extern std::map<int, gameinfo> glist;
 //用户列表更新标志
 extern bool uchanged;
+//共享资源读取线程数
+extern int readcnt;
+//总线程数
+extern int threadcnt;
+//共享资源读写锁
+extern pthread_rwlock_t rwlock;

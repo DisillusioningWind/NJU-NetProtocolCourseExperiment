@@ -19,9 +19,9 @@ $(CLIENT): $(CLIENTFILES)
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
 # 伪目标
-.PHONY: clean runServer runClient test
+.PHONY: runServer runClient clean test
 
-# 测试
+# 运行
 runServer:
 	@./$(SERVER)
 
