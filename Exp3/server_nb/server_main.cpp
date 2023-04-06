@@ -20,12 +20,7 @@ int main()
 
     while(true)
     {
-        if(uchanged)
-        {
-            // 打印菜单
-            server_show_menu();
-            uchanged = false;
-        }
+        server_show_menu();
         testfds = readfds;
         testout = timeout;
         //select调用
@@ -44,7 +39,11 @@ int main()
             //接受客户端连接
             int cfd = accept(lfd, (sockaddr*)&caddr, (socklen_t*)&addrlen);
             ERR(cfd < 0, "accept failed ")
-            //创建子线程处理客户端请求
+            //总线程数加1
+            pthread_rwlock_wrlock(&rwlock);
+            threadcnt++;
+            pthread_rwlock_unlock(&rwlock);
+            // 创建子线程处理客户端请求
             pthread_t tid;
             pthread_create(&tid, NULL, server_thread, (void*)&cfd);
             pthread_detach(tid);

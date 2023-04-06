@@ -8,9 +8,9 @@ bool uchanged = false;
 int readcnt = 0;
 int threadcnt = 1;
 pthread_rwlock_t rwlock;
-//仅该文件内可见
 
-std::map<std::string, state>::iterator uit;
+//仅该文件内可见
+//线程局部存储
 pthread_key_t key;
 
 int server_listen(int port)
@@ -47,134 +47,273 @@ void server_set_nonblocking(int fd) {
 
 void server_show_menu()
 {
-    CLS
-    printf("**********online user list********************game info***********\n");
     int i = 0, g = 0;
-    uit = ulist.begin();
-    for (;uit != ulist.end() || g < glist.size();)
+    std::map<std::string, state>::iterator uit;
+    pthread_rwlock_rdlock(&rwlock);
+    if(uchanged)
     {
-        if (uit != ulist.end())
+        readcnt++;
+        if(readcnt == threadcnt)
         {
-            printf("*%02d. name:%-8s state:%-10s", i + 1, uit->first.c_str(), uit->second.to_string());
-            uit++;
-            i++;
+            uchanged = false;
+            readcnt = 0;
         }
-        else
+        CLS
+        printf("**********online user list********************game info***********\n");
+        uit = ulist.begin();gameinfo gi;
+        for (;uit != ulist.end() || g < glist.size();)
         {
-            printf("*                         ");//27个空格
+            if (uit != ulist.end())
+            {
+                printf("*%02d. name:%-8s state:%-10s", i + 1, uit->first.c_str(), uit->second.to_string());
+                uit++;
+                i++;
+            }
+            else
+            {
+                printf("*                         ");//27个空格
+            }
+            if (g < glist.size() && (gi = glist[g]).round != 0)
+            {
+                printf("*%02d. player1:%-8s player2:%-8s*\n", g + 1, gi.get_p1_name().c_str(), gi.get_p2_name().c_str());
+                g++;
+            }
+            else
+            {
+                printf("*                             *\n");//31个空格
+            }
         }
-        if (g < glist.size())
-        {
-            printf("*%02d. player1:%-8s player2:%-8s*\n", g + 1, glist[g].p1.name.c_str(), glist[g].p2.name.c_str());
-            g++;
-        }
-        else
-        {
-            printf("*                             *\n");//31个空格
-        }
+        printf("******************************************************************\n");
     }
-    printf("******************************************************************\n");
+    pthread_rwlock_unlock(&rwlock);
 }
 
 void *server_thread(void *arg)
 {
-    int cfd = *(int*)arg;
-
-    //打印客户端ip和端口
-    // struct sockaddr_in caddr;
-    // socklen_t addrlen = sizeof(caddr);
-    // getpeername(cfd, (struct sockaddr*)&caddr, &addrlen);
-    // printf("client ip=%s port=%d\n", inet_ntoa(caddr.sin_addr), ntohs(caddr.sin_port));
-
+    int cfd = *(int *)arg, stage = 0, rt = 0;
     fd_set rset, allset;
     timeval rtv, tv;
+    clipkt cpkt;
+    srvpkt spkt;
     FD_ZERO(&allset);
     FD_SET(cfd, &allset);
     tv.tv_sec = 0;
-    tv.tv_usec = 500000;
+    tv.tv_usec = 500000;//0.5s
 
     while(true)
     {
         rset = allset;
         rtv = tv;
+        spkt.zero();
         int rc = select(cfd + 1, &rset, NULL, NULL, &rtv);
         ERR(rc < 0, "select failed ")
-        if(FD_ISSET(cfd, &rset))
+        else if(rc == 0) {stage = 1;}
+        else if(FD_ISSET(cfd, &rset))
         {
-            //接收客户端请求
-            clipkt cpkt;
-            int rt1 = recv(cfd, &cpkt, sizeof(cpkt), 0);
-            srvpkt spkt;
-            server_handle(rt1, cpkt, spkt);
-            // 发送响应
-            int rt2 = send(cfd, &spkt, sizeof(spkt), 0);
-            ERR(rt2 < 0, "send failed ")
+            rt = recv(cfd, &cpkt, sizeof(cpkt), 0);
+            stage = server_recv_state(rt, cpkt);
         }
+        //根据stage的值进行不同的处理
+        server_handle(cfd, stage, cpkt, spkt);
     }
     close(cfd);
+    //线程结束
+    pthread_rwlock_wrlock(&rwlock);
+    threadcnt--;
+    pthread_rwlock_unlock(&rwlock);
     return NULL;
 }
 
-void server_handle(int res, clipkt &p, srvpkt &spkt)
+void server_handle(int cfd, int &stage, clipkt &cpkt, srvpkt &spkt)
 {
-    if(res == 0)
+    switch (stage)
+    {
+    //超时
+    case 1:
+    {
+        //to do 
+        break;
+    }
+    //客户端退出
+    case 2:
     {
         std::string n = *(std::string *)pthread_getspecific(key);
         ERR(n == "", "client not login ")
-        //客户端断开连接
-        pthread_rwlock_wrlock(&rwlock);
         //从游戏列表和用户列表中删除
+        pthread_rwlock_wrlock(&rwlock);
         glist.erase(ulist[n].gid);
         ulist.erase(n);
         uchanged = true;
+        threadcnt--;
         pthread_rwlock_unlock(&rwlock);
+        close(cfd);
+        pthread_exit(NULL);
     }
-    else if(res > 0)
+    //客户端登录
+    case 3:
+    {
+        std::string n = cpkt.n.to_string();
+        pthread_rwlock_wrlock(&rwlock);
+        if (ulist.find(n) == ulist.end())
+        {
+            // 登录成功
+            ulist[n] = state();
+            uchanged = true;
+            pthread_rwlock_unlock(&rwlock);
+            pthread_setspecific(key, (void *)&n);
+            spkt.type = srvtype::loginok;
+        }
+        else
+        {
+            // 登录失败
+            pthread_rwlock_unlock(&rwlock);
+            spkt.type = srvtype::loginfail;
+        }
+        break;
+    }
+    //客户端发送邀请
+    case 4:
+    {
+        std::string oppo = cpkt.n.to_string();
+        std::string n = *(std::string *)pthread_getspecific(key);
+        ERR(n == "", "client not login ")
+        pthread_rwlock_wrlock(&rwlock);
+        if (ulist.find(oppo) != ulist.end() && ulist[oppo].st == estate::login)
+        {
+            //添加对局信息
+            int gid = glist.size();
+            glist.insert({gid, gameinfo(n)});
+            glist[gid].set_p2(oppo);
+            glist[gid].set_rdy(n, true);
+            ulist[n].gid = gid;
+            ulist[oppo].gid = gid;
+            pthread_rwlock_unlock(&rwlock);
+        }
+        else
+        {
+            // 请求失败
+            pthread_rwlock_unlock(&rwlock);
+            spkt.type = srvtype::gamerefuse;
+            spkt.n[0] = name(oppo);
+        }
+        break;
+    }
+    //客户端接受邀请
+    case 5:
+    {
+        std::string oppo = cpkt.n.to_string();
+        std::string n = *(std::string *)pthread_getspecific(key);
+        ERR(n == "", "client not login ")
+        pthread_rwlock_wrlock(&rwlock);
+        int gid = ulist[n].gid;
+        if (glist.find(gid) != glist.end())
+        {
+            //接受邀请
+            glist[gid].set_rdy(n, true);
+            if(glist[gid].is_rdy(oppo))
+            {
+                glist[gid].round = 1;
+            }
+            pthread_rwlock_unlock(&rwlock);
+            spkt.type = srvtype::gamestart;
+            spkt.round = 1;
+        }
+        else
+        {
+            //接受失败
+            pthread_rwlock_unlock(&rwlock);
+            spkt.type = srvtype::gamerefuse;
+            spkt.n[0] = name(n);
+        }
+        break;
+    }
+    //客户端拒绝邀请
+    case 6:
+    {
+        std::string oppo = cpkt.n.to_string();
+        std::string n = *(std::string *)pthread_getspecific(key);
+        ERR(n == "", "client not login ")
+        pthread_rwlock_wrlock(&rwlock);
+        int gid = ulist[n].gid;
+        if (glist.find(gid) != glist.end())
+        {
+            //拒绝邀请
+            glist[gid].set_refuse(n, true);
+        }
+        pthread_rwlock_unlock(&rwlock);
+        break;
+    }
+    //客户端退出游戏
+    case 7:
+    {
+        std::string n = *(std::string *)pthread_getspecific(key);
+        ERR(n == "", "client not login ")
+        pthread_rwlock_wrlock(&rwlock);
+        int gid = ulist[n].gid;
+        if (glist.find(gid) != glist.end())
+        {
+            //退出游戏
+            glist[gid].set_quit(n, true);
+        }
+        pthread_rwlock_unlock(&rwlock);
+        break;
+    }
+    //客户端发送答案
+    case 8:
+    {
+        std::string n = *(std::string *)pthread_getspecific(key);
+        ERR(n == "", "client not login ")
+        pthread_rwlock_wrlock(&rwlock);
+        int gid = ulist[n].gid;
+        if (glist.find(gid) != glist.end())
+        {
+            //发送答案
+            glist[gid].set_ans(n, cpkt.ans);
+        }
+        pthread_rwlock_unlock(&rwlock);
+        break;
+    }
+    }
+    if(spkt.type != srvtype::nosend)
+    {
+        send(cfd, &spkt, sizeof(spkt), 0);
+    }
+}
+
+int server_recv_state(int rt, clipkt &p)
+{
+    if(rt == 0)
+    {
+        return 2;
+    }
+    else if(rt > 0)
     {
         switch(p.type)
         {
-            case clitype::login:
-            {
-                std::string n = p.n.to_string();
-                pthread_rwlock_wrlock(&rwlock);
-                if (ulist.find(n) == ulist.end())
-                {
-                    // 登录成功
-                    ulist[n] = state();
-                    uchanged = true;
-                    pthread_rwlock_unlock(&rwlock);
-                    pthread_setspecific(key, (void *)&n);
-                    spkt.type = srvtype::loginok;
-                }
-                else
-                {
-                    // 登录失败
-                    pthread_rwlock_unlock(&rwlock);
-                    spkt.type = srvtype::loginfail;
-                }
-                break;
-            }
-            case clitype::gamerequest:
-            {
-                std::string oppo = p.n.to_string();
-                std::string n = *(std::string *)pthread_getspecific(key);
-                ERR(n == "", "client not login ")
-                pthread_rwlock_rdlock(&rwlock);
-                if (ulist.find(oppo) != ulist.end() && ulist[oppo].st == estate::login)
-                {
-                    pthread_rwlock_unlock(&rwlock);
-                    spkt.type = srvtype::gamerequest;
-                    spkt.n[0] = name(n);
-                }
-                else
-                {
-                    // 请求失败
-                    pthread_rwlock_unlock(&rwlock);
-                    spkt.type = srvtype::gamerefuse;
-                    spkt.n[0] = name(oppo);
-                }
-                break;
-            }
+        case clitype::login:
+        {
+            return 3;
+        }
+        case clitype::gamerequest:
+        {
+            return 4;
+        }
+        case clitype::gameaccept:
+        {
+            return 5;
+        }
+        case clitype::gamerefuse:
+        {
+            return 6;
+        }
+        case clitype::gamequit:
+        {
+            return 7;
+        }
+        case clitype::gameanswer:
+        {
+            return 8;
+        }
         }
     }
 }

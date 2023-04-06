@@ -8,12 +8,14 @@
 int server_listen(int port);
 //设置非阻塞
 void server_set_nonblocking(int fd);
-//服务器菜单
+//显示服务器菜单，如果有用户状态变化则更新
 void server_show_menu();
 //服务器子线程处理函数
 void* server_thread(void* arg);
-//子线程对收到包的处理
-void server_handle(int res, clipkt &p, srvpkt &spkt);
+//子线程对不同状态的处理
+void server_handle(int cfd, int &stage, clipkt &p, srvpkt &spkt);
+//子线程根据收到的包设置不同的状态
+int server_recv_state(int rt, clipkt &p);
 
 #pragma region 自定义类型
 
@@ -27,7 +29,7 @@ struct state
 {
     estate st;
     int gid;
-    state() : st(estate::login) {}
+    state() : st(estate::login),gid(-1) {}
     void join_game(int g) {st = estate::game; gid = g;}
     const char* to_string()
     {
@@ -46,8 +48,9 @@ struct state
 //对局内用户信息
 struct userinfo
 {
-    std::string name;
     bool rdy;
+    bool refuse;
+    bool quit;
     answer ans;
     uint8_t score;
 };
@@ -55,17 +58,23 @@ struct userinfo
 // 对局信息
 struct gameinfo
 {
-    userinfo p1;
-    userinfo p2;
+    std::map<std::string, userinfo> pl;
     uint8_t round;
 
-    void zero()
+    void zero() {memset(this, 0, sizeof(gameinfo));}
+
+    gameinfo() { zero(); }
+    gameinfo(std::string name)
     {
-        memset(this, 0, sizeof(gameinfo));
+        zero();
+        pl.insert({name, userinfo()});
     }
 
     void end_round()
     {
+        auto it = pl.begin();
+        userinfo p1 = it->second;it++;
+        userinfo p2 = it->second;
         if (p1.ans == p2.ans) {}
         else if (p1.ans == answer::rock && p2.ans == answer::scissors) p1.score++;
         else if (p1.ans == answer::paper && p2.ans == answer::rock) p1.score++;
@@ -74,34 +83,19 @@ struct gameinfo
         round++;
     }
 
-    gameinfo() { zero(); }
+    userinfo& get_p1() {return pl.begin()->second;}
+    userinfo& get_p2() {return (++pl.begin())->second;}
+    std::string get_p1_name() {return pl.begin()->first;}
+    std::string get_p2_name() {return (++pl.begin())->first;}
 
-    gameinfo(std::string name)
-    {
-        zero();
-        p1.name = name;
-    }
-
-    void set_p2(std::string name)
-    {
-        p2.name = name;
-    }
-
-    void set_rdy(std::string name, bool rdy)
-    {
-        if (p1.name == name)
-            p1.rdy = rdy;
-        else if (p2.name == name)
-            p2.rdy = rdy;
-    }
-
-    void set_ans(std::string name, answer ans)
-    {
-        if (p1.name == name)
-            p1.ans = ans;
-        else if (p2.name == name)
-            p2.ans = ans;
-    }
+    void set_p2(std::string name) {pl.insert({ name, userinfo() });}
+    void set_rdy(std::string name, bool rdy) {pl[name].rdy = rdy;}
+    void set_refuse(std::string name, bool refuse) {pl[name].refuse = refuse;}
+    void set_quit(std::string name, bool quit) {pl[name].quit = quit;}
+    bool is_rdy(std::string name) {return pl[name].rdy;}
+    bool is_refuse(std::string name) {return pl[name].refuse;}
+    bool is_quit(std::string name) {return pl[name].quit;}
+    void set_ans(std::string name, answer ans) {pl[name].ans = ans;}
 };
 
 #pragma endregion

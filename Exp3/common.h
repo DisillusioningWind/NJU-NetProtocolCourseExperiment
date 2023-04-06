@@ -66,7 +66,8 @@ struct clipkt
 //服务器发包类型
 enum class srvtype : uint8_t
 {
-    loginok = 0x00,
+    nosend = 0x00,
+    loginok,
     loginfail,
     gamerequest,
     gamewait,
