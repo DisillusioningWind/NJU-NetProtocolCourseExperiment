@@ -36,30 +36,25 @@ int main(int argc, char** argv)
                     oppo.name = spkt.u[0].n.to_string();
                     res = 4;
                 }
-                else if(stage == 3 && spkt.type == srvtype::gamerefuse)
+                else if(stage == 5 && spkt.type == srvtype::gamerefuse)
                 {
                     stage = 2;
                     res = 5;
                     oppo.zero();
                 }
-                else if((stage == 3 || stage == 5) && spkt.type == srvtype::gamestart)
+                else if(stage == 5 && spkt.type == srvtype::gamestart)
                 {
                     stage = 4;
+                    round = 1;
                 }
                 else if(stage == 4 && spkt.type == srvtype::gameanswer)
                 {
                     round = spkt.round;
                     oppo.ans = spkt.ans;
                     client_end_round();
-                    if(self.score >= 2)
+                    if(self.score >= 2 || oppo.score >= 2)
                     {
                         stage = 6;
-                        res = 8;
-                    }
-                    else if(oppo.score >= 2)
-                    {
-                        stage = 6;
-                        res = 9;
                     }
                     else
                     {
@@ -138,21 +133,26 @@ int main(int argc, char** argv)
                     cpkt.type = clitype::gamerequest;
                     cpkt.n = buf;
                     send(cfd, &cpkt, sizeof(clipkt), 0);
+                    stage = 5;
                 }
             }
             //出拳
             else if(stage == 4 && strlen(buf) > 0)
             {
-                if(strncmp(buf,"rock",4) == 0) {self.ans == answer::rock;}
-                else if(strncmp(buf,"paper",5) == 0) {self.ans == answer::paper;}
-                else if(strncmp(buf,"scissors",8) == 0) {self.ans == answer::scissors;}
-                else if(strncmp(buf,"3", 1) == 0)
+                if(strncmp(buf,"r",1) == 0) {self.ans == answer::rock;}
+                else if(strncmp(buf,"p",1) == 0) {self.ans == answer::paper;}
+                else if(strncmp(buf,"s",1) == 0) {self.ans == answer::scissors;}
+                else if(strncmp(buf,"3",1) == 0)
                 {
                     cpkt.type = clitype::gamequit;
                     cpkt.n = self.name;
                     send(cfd, &cpkt, sizeof(clipkt), 0);
                     stage = 2;
                     res = 2;
+                }
+                else if(strncmp(buf,"c",1) == 0)
+                {
+                    res = 10;
                 }
                 else {res = 1;}
                 if(res == 0)

@@ -52,6 +52,11 @@ void client_show_menu()
             }          
             printf("(2) Play with a friend, (#) Exit\n");
         }
+        //你退出游戏
+        else if(res == 2)
+        {
+            printf("You have left the game.\n");
+        }
         //有邀请
         else if(res == 4)
         {
@@ -75,7 +80,55 @@ void client_show_menu()
         else if(res == 1) {printf("Username should be less than 16 characters, please try again.\n");}
     }
     //游戏中
-    
+    else if(stage == 4)
+    {
+        if(res == 0 || res == 10)
+        {
+            CLS
+            printf("Round %d\n", round);
+            printf("Your score: %d\n", self.score);
+            printf("Opponent's score: %d\n", oppo.score);
+            printf("(3) Left the game, (#) Exit\n");
+            printf("Your turn, please input your answer (r/p/s): ");
+        }
+        else if(res == 1) {printf("Invalid input, please try again.\n");}
+        //回合结束
+        else if(res == 6)
+        {
+            CLS
+            printf("Round %d ends.\n", round);
+            printf("Your score: %d\n", self.score);
+            printf("Opponent's score: %d\n", oppo.score);
+            printf("Your answer: %s\n", self.ans == answer::rock ? "Rock" : self.ans == answer::paper ? "Paper" : self.ans == answer::scissors ? "Scissors" : "Unknown");
+            printf("Opponent's answer: %s\n", oppo.ans == answer::rock ? "Rock" : oppo.ans == answer::paper ? "Paper" : oppo.ans == answer::scissors ? "Scissors" : "Unknown");
+            printf("Round result: %s\n", roundres == 1 ? "You win" : roundres == 0 ? "You lose" : roundres == 2 ? "Draw" : "Unknown");
+            printf("Press c to continue...\n");
+        }
+    }
+    //等待游戏开始
+    else if(stage == 5)
+    {
+        if(res == 0)
+        {
+            CLS
+            printf("Waiting for the game to start...\n");
+            printf("(3) Left the game, (#) Exit\n");
+        }
+    }
+    //显示游戏结果
+    else if(stage == 6)
+    {
+        if(res == 0)
+        {
+            CLS
+            printf("Game ends.\n");
+            printf("Your score: %d\n", self.score);
+            printf("Opponent's score: %d\n", oppo.score);
+            printf("Game result: %s\n", self.score > oppo.score ? "You win" : self.score < oppo.score ? "You lose" : "Draw");
+            printf("Press c to continue...\n");
+        }
+    }
+    res = 0;
 }
 
 void client_end_round()
