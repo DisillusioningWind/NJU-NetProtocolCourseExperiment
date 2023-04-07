@@ -47,7 +47,7 @@ void server_show_menu(int cfd)
     int i = 0, g = 0;
     std::map<std::string, state>::iterator uit;
     pthread_rwlock_rdlock(&rwlock);
-    if(uchanged)
+    if(uchanged && readcnt[cfd] == false)
     {
         readcnt[cfd] = true;
         int readsize = std::count_if(readcnt.begin(), readcnt.end(), [](std::pair<int, bool> p){return p.second == true;});
@@ -134,7 +134,7 @@ void server_handle(int cfd, int &stage, std::string& name, clipkt &cpkt, srvpkt 
         int i = 0;
         int gid = ulist[name].gid;
         pthread_rwlock_wrlock(&rwlock);
-        if(uchanged)
+        if(uchanged && readcnt[cfd] == false)
         {
             readcnt[cfd] = true;
             int readsize = std::count_if(readcnt.begin(), readcnt.end(), [](std::pair<int, bool> p){return p.second == true;});
