@@ -60,37 +60,40 @@ struct gameinfo
     std::map<std::string, uint8_t> read;
     uint8_t round;
 
-    void zero() {memset(this, 0, sizeof(gameinfo));}
-
-    gameinfo() { zero(); }
+    gameinfo() {}
     gameinfo(std::string name)
     {
-        zero();
         pl.insert({name, userinfo()});
         read.insert({name, 0});
     }
 
-    void end_round()
+    void end_round(std::string name)
     {
-        auto it = pl.begin();
-        std::string p1name = it->first;
-        userinfo p1 = it->second;
-        it++;
-        std::string p2name = it->first;
-        userinfo p2 = it->second;
-        if(read[p1name] != 0 || read[p2name] != 0) return;
+        //获得oppo的名字
+        std::string oppo;
+        for (auto& p : pl)
+        {
+            if (p.first != name)
+            {
+                oppo = p.first;
+                break;
+            }
+        }
+        if(read[name] != 0 || read[oppo] != 0) return;
+        userinfo& p1 = pl[name];
+        userinfo& p2 = pl[oppo];
         if(p1.ans == answer::unknown || p2.ans == answer::unknown) return;
         else if (p1.ans == p2.ans) {}
         else if (p1.ans == answer::rock && p2.ans == answer::scissors) p1.score++;
         else if (p1.ans == answer::paper && p2.ans == answer::rock) p1.score++;
         else if (p1.ans == answer::scissors && p2.ans == answer::paper) p1.score++;
         else p2.score++;
-        ans[get_p1_name()] = p1.ans;
-        ans[get_p2_name()] = p2.ans;
+        ans[name] = p1.ans;
+        ans[oppo] = p2.ans;
         p1.ans = answer::unknown;
         p2.ans = answer::unknown;
-        read[p1name]++;
-        read[p2name]++;
+        read[name]++;
+        read[oppo]++;
     }
 
     void next_round()

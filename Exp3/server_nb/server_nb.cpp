@@ -130,7 +130,6 @@ void server_handle(int cfd, int &stage, std::string& name, clipkt &cpkt, srvpkt 
     {
         if(name == "") return;
         //更新用户列表
-        spkt.type = srvtype::userinfo;
         int i = 0;
         int gid = ulist[name].gid;
         pthread_rwlock_wrlock(&rwlock);
@@ -150,6 +149,7 @@ void server_handle(int cfd, int &stage, std::string& name, clipkt &cpkt, srvpkt 
                 spkt.u[i].st = uit->second.st;
                 i++;
             }
+            spkt.type = srvtype::userinfo;
             spkt.res_num = (uint8_t)i;
             send(cfd, &spkt, sizeof(spkt), 0);
             spkt.zero();
@@ -201,7 +201,7 @@ void server_handle(int cfd, int &stage, std::string& name, clipkt &cpkt, srvpkt 
             //对手出拳
             else if(glist[gid].round != 0)
             {
-                glist[gid].end_round();
+                glist[gid].end_round(name);
                 if(glist[gid].read[name] == 1)
                 {
                     spkt.type = srvtype::gameanswer;
@@ -277,7 +277,13 @@ void server_handle(int cfd, int &stage, std::string& name, clipkt &cpkt, srvpkt 
         if (ulist.find(oppo) != ulist.end() && ulist[oppo].st == estate::login)
         {
             //添加对局信息
-            int gid = (--glist.end())->first + 1;
+            int gid = 0;
+            if (glist.size() != 0)
+            {
+                auto git = glist.end();
+                git--;
+                gid = git->first + 1;
+            }
             glist.insert({gid, gameinfo(name)});
             glist[gid].set_p2(oppo);
             glist[gid].set_rdy(name, true);

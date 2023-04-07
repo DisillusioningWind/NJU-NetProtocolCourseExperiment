@@ -76,7 +76,7 @@ void client_show_menu()
     //输入对战用户名
     else if(stage == 3)
     {
-        if(res == 0) {printf("Please input the username of your opponent: ");}
+        if(res == 0) {printf("Please input the username of your opponent:\n");}
         else if(res == 1) {printf("Username should be less than 16 characters, please try again.\n");}
     }
     //游戏中
@@ -89,7 +89,7 @@ void client_show_menu()
             printf("Your score: %d\n", self.score);
             printf("Opponent's score: %d\n", oppo.score);
             printf("(3) Left the game, (#) Exit\n");
-            printf("Your turn, please input your answer (r/p/s): ");
+            printf("Your turn, please input your answer (r/p/s):\n");
         }
         else if(res == 1) {printf("Invalid input, please try again.\n");}
         //回合结束

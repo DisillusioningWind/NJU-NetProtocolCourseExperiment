@@ -86,7 +86,7 @@ int main(int argc, char** argv)
             buf[strcspn(buf, "\n")] = 0;
             if(strncmp(buf, "#", 1) == 0) { break; }
             //登录
-            else if(stage == 0 && strncmp(buf, "1", 1) == 0) {stage = 1;}
+            else if(stage == 0 && strncmp(buf, "1", 1) == 0) {stage = 1;continue;}
             else if(stage == 1 && strlen(buf) > 0)
             {
                 int len = strlen(buf);
@@ -102,15 +102,17 @@ int main(int argc, char** argv)
                     cpkt.n = buf;
                     send(cfd, &cpkt, sizeof(clipkt), 0);
                 }
+                continue;
             }
             //邀请/接受邀请
-            else if(stage == 2 && strncmp(buf,"2", 1) == 0) {stage = 3;}
+            else if(stage == 2 && strncmp(buf,"2", 1) == 0) {stage = 3;continue;}
             else if(stage == 2 && strncmp(buf, "y", 1) == 0)
             {
                 cpkt.type = clitype::gameaccept;
                 cpkt.n = oppo.name;
                 send(cfd, &cpkt, sizeof(clipkt), 0);
                 stage = 5;
+                continue;
             }
             else if(stage == 2 && strncmp(buf, "n", 1) == 0)
             {
@@ -118,6 +120,7 @@ int main(int argc, char** argv)
                 cpkt.n = oppo.name;
                 send(cfd, &cpkt, sizeof(clipkt), 0);
                 stage = 2;
+                continue;
             }
             else if(stage == 3 && strlen(buf) > 0)
             {
@@ -135,13 +138,14 @@ int main(int argc, char** argv)
                     send(cfd, &cpkt, sizeof(clipkt), 0);
                     stage = 5;
                 }
+                continue;
             }
             //出拳
             else if(stage == 4 && strlen(buf) > 0)
             {
-                if(strncmp(buf,"r",1) == 0) {self.ans == answer::rock;}
-                else if(strncmp(buf,"p",1) == 0) {self.ans == answer::paper;}
-                else if(strncmp(buf,"s",1) == 0) {self.ans == answer::scissors;}
+                if(strncmp(buf,"r",1) == 0) {self.ans = answer::rock;}
+                else if(strncmp(buf,"p",1) == 0) {self.ans = answer::paper;}
+                else if(strncmp(buf,"s",1) == 0) {self.ans = answer::scissors;}
                 else if(strncmp(buf,"3",1) == 0)
                 {
                     cpkt.type = clitype::gamequit;
@@ -160,10 +164,12 @@ int main(int argc, char** argv)
                     cpkt.type = clitype::gameanswer;
                     cpkt.round = round;
                     cpkt.n = self.name;
-                    send(cfd, &cpkt, sizeof(clipkt), 0);    
+                    cpkt.ans = self.ans;
+                    send(cfd, &cpkt, sizeof(clipkt), 0);
                 }
+                continue;
             }
-            else if(stage == 6){stage = 2;}
+            else if(stage == 6){stage = 2;continue;}
         }
     }
     close(cfd);
