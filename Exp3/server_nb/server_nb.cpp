@@ -103,6 +103,7 @@ void *server_thread(void *arg)
     {
         rset = allset;
         rtv = tv;
+        cpkt.zero();
         spkt.zero();
         int rc = select(cfd + 1, &rset, NULL, NULL, &rtv);
         ERR(rc < 0, "select failed ")

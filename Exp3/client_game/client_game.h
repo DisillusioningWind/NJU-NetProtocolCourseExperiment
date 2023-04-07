@@ -8,6 +8,8 @@ int client_connect(const char* ip, int port);
 //客户端菜单
 void client_show_menu();
 
+void client_end_round();
+
 struct player
 {
     std::string name;
@@ -28,6 +30,7 @@ extern int stage;
 extern int res;
 extern std::map<int, fri> flist;
 extern int round;
+extern int roundres;
 extern player self;
 extern player oppo;
 

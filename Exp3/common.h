@@ -73,6 +73,7 @@ struct clipkt
     uint8_t round;
     answer ans;
     name n;
+    void zero() {memset(this, 0, sizeof(clipkt));}
 };
 #pragma endregion
 #pragma region srvpkt
@@ -87,7 +88,7 @@ enum class srvtype : uint8_t
     gamestart,
     gameanswer,
     gamequit,
-    gameover,
+    //gameover,
     userinfo
 };
 //服务器数据包，大小为165字节
