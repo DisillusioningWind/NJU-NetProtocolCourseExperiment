@@ -15,6 +15,7 @@
 #include <map>
 #include <string>
 #include <string.h>
+#include <algorithm>
 
 #define SERV_PORT 12345
 #define USER_NUM 10

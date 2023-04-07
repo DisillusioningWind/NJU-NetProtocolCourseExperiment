@@ -5,8 +5,7 @@
 std::map<std::string, state> ulist;
 std::map<int, gameinfo> glist;
 bool uchanged = false;
-int readcnt = 0;
-int threadcnt = 1;
+std::map<int, bool> readcnt;
 pthread_rwlock_t rwlock;
 
 //仅该文件内可见
@@ -43,18 +42,19 @@ void server_set_nonblocking(int fd) {
     fcntl(fd, F_SETFL, O_NONBLOCK);
 }
 
-void server_show_menu()
+void server_show_menu(int cfd)
 {
     int i = 0, g = 0;
     std::map<std::string, state>::iterator uit;
     pthread_rwlock_rdlock(&rwlock);
     if(uchanged)
     {
-        readcnt++;
-        if(readcnt == threadcnt)
+        readcnt[cfd] = true;
+        int readsize = std::count_if(readcnt.begin(), readcnt.end(), [](std::pair<int, bool> p){return p.second == true;});
+        if(readsize == readcnt.size())
         {
             uchanged = false;
-            readcnt = 0;
+            for(auto& p: readcnt) p.second = false;
         }
         CLS
         printf("**********online user list********************game info***********\n");
@@ -98,6 +98,7 @@ void *server_thread(void *arg)
     FD_SET(cfd, &allset);
     tv.tv_sec = 0;
     tv.tv_usec = 500000;//0.5s
+    readcnt[cfd] = false;
 
     while(true)
     {
@@ -117,10 +118,6 @@ void *server_thread(void *arg)
         server_handle(cfd, stage, name, cpkt, spkt);
     }
     close(cfd);
-    //线程结束
-    pthread_rwlock_wrlock(&rwlock);
-    threadcnt--;
-    pthread_rwlock_unlock(&rwlock);
     return NULL;
 }
 
@@ -131,18 +128,20 @@ void server_handle(int cfd, int &stage, std::string& name, clipkt &cpkt, srvpkt 
     //超时
     case 1:
     {
+        if(name == "") return;
         //更新用户列表
         spkt.type = srvtype::userinfo;
         int i = 0;
         int gid = ulist[name].gid;
         pthread_rwlock_wrlock(&rwlock);
-        if(uchanged && name != "")
+        if(uchanged)
         {
-            readcnt++;
-            if(readcnt == threadcnt)
+            readcnt[cfd] = true;
+            int readsize = std::count_if(readcnt.begin(), readcnt.end(), [](std::pair<int, bool> p){return p.second == true;});
+            if(readsize == readcnt.size())
             {
                 uchanged = false;
-                readcnt = 0;
+                for(auto& p: readcnt) p.second = false;
             }
             auto uit = ulist.begin();
             for (;uit != ulist.end() && i < USER_NUM; uit++)
@@ -243,7 +242,6 @@ void server_handle(int cfd, int &stage, std::string& name, clipkt &cpkt, srvpkt 
         }
         ulist.erase(name);    
         uchanged = true;
-        threadcnt--;
         pthread_rwlock_unlock(&rwlock);
         close(cfd);
         pthread_exit(NULL);
@@ -409,4 +407,9 @@ int server_recv_state(int rt, clipkt &p)
         }
         }
     }
+    else
+    {
+        return -1;
+    }
+    return 0;
 }

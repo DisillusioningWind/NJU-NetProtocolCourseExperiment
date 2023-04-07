@@ -18,9 +18,11 @@ int main()
     FD_SET(0, &readfds);
     FD_SET(lfd, &readfds);
 
+    readcnt[lfd] = false;
+
     while(true)
     {
-        server_show_menu();
+        server_show_menu(lfd);
         testfds = readfds;
         testout = timeout;
         //select调用
@@ -39,10 +41,6 @@ int main()
             //接受客户端连接
             int cfd = accept(lfd, (sockaddr*)&caddr, (socklen_t*)&addrlen);
             ERR(cfd < 0, "accept failed ")
-            //总线程数加1
-            pthread_rwlock_wrlock(&rwlock);
-            threadcnt++;
-            pthread_rwlock_unlock(&rwlock);
             // 创建子线程处理客户端请求
             pthread_t tid;
             pthread_create(&tid, NULL, server_thread, (void*)&cfd);

@@ -9,7 +9,7 @@ int server_listen(int port);
 //设置非阻塞
 void server_set_nonblocking(int fd);
 //显示服务器菜单，如果有用户状态变化则更新
-void server_show_menu();
+void server_show_menu(int cfd);
 //服务器子线程处理函数
 void* server_thread(void* arg);
 //子线程对不同状态的处理
@@ -127,8 +127,6 @@ extern std::map<int, gameinfo> glist;
 //用户列表更新标志
 extern bool uchanged;
 //共享资源读取线程数
-extern int readcnt;
-//总线程数
-extern int threadcnt;
+extern std::map<int, bool> readcnt;
 //共享资源读写锁
 extern pthread_rwlock_t rwlock;

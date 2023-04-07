@@ -36,7 +36,7 @@ void client_show_menu()
     //输入用户名
     else if(stage == 1)
     {
-        if(res == 0) {printf("Please input your username: ");}
+        if(res == 0) {printf("Please input your username:\n");}
         else if(res == 1) {printf("Username should be less than 16 characters, please try again.\n");}
         else if(res == 3) {printf("Username has been used, please try again.\n");}
     }
