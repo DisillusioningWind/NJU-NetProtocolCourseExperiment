@@ -13,24 +13,21 @@ void server_show_menu();
 //服务器子线程处理函数
 void* server_thread(void* arg);
 //子线程对不同状态的处理
-void server_handle(int cfd, int &stage, clipkt &p, srvpkt &spkt);
+void server_handle(int cfd, int &stage, std::string& name, clipkt &cpkt, srvpkt &spkt);
 //子线程根据收到的包设置不同的状态
 int server_recv_state(int rt, clipkt &p);
 
 #pragma region 自定义类型
 
-enum class estate : uint8_t
-{
-    login = 0x00,
-    game
-};
-//用户状态
+
+//用户状态及对局号
 struct state
 {
     estate st;
     int gid;
     state() : st(estate::login),gid(-1) {}
     void join_game(int g) {st = estate::game; gid = g;}
+    void leave_game() {st = estate::login; gid = -1;}
     const char* to_string()
     {
         switch (st)
@@ -59,6 +56,8 @@ struct userinfo
 struct gameinfo
 {
     std::map<std::string, userinfo> pl;
+    std::map<std::string, answer> ans;
+    std::map<std::string, uint8_t> read;
     uint8_t round;
 
     void zero() {memset(this, 0, sizeof(gameinfo));}
@@ -68,27 +67,47 @@ struct gameinfo
     {
         zero();
         pl.insert({name, userinfo()});
+        read.insert({name, 0});
     }
 
     void end_round()
     {
         auto it = pl.begin();
-        userinfo p1 = it->second;it++;
+        std::string p1name = it->first;
+        userinfo p1 = it->second;
+        it++;
+        std::string p2name = it->first;
         userinfo p2 = it->second;
-        if (p1.ans == p2.ans) {}
+        if(read[p1name] != 0 || read[p2name] != 0) return;
+        if(p1.ans == answer::unknown || p2.ans == answer::unknown) return;
+        else if (p1.ans == p2.ans) {}
         else if (p1.ans == answer::rock && p2.ans == answer::scissors) p1.score++;
         else if (p1.ans == answer::paper && p2.ans == answer::rock) p1.score++;
         else if (p1.ans == answer::scissors && p2.ans == answer::paper) p1.score++;
         else p2.score++;
+        ans[get_p1_name()] = p1.ans;
+        ans[get_p2_name()] = p2.ans;
+        p1.ans = answer::unknown;
+        p2.ans = answer::unknown;
+        read[p1name]++;
+        read[p2name]++;
+    }
+
+    void next_round()
+    {
         round++;
+        read[get_p1_name()] = 0;
+        read[get_p2_name()] = 0;
     }
 
     userinfo& get_p1() {return pl.begin()->second;}
     userinfo& get_p2() {return (++pl.begin())->second;}
+    userinfo& get_oppo(std::string name) {return name == get_p1_name() ? get_p2() : get_p1();}
     std::string get_p1_name() {return pl.begin()->first;}
     std::string get_p2_name() {return (++pl.begin())->first;}
+    std::string get_oppo_name(std::string name) {return name == get_p1_name() ? get_p2_name() : get_p1_name();}
 
-    void set_p2(std::string name) {pl.insert({ name, userinfo() });}
+    void set_p2(std::string name) {pl.insert({ name, userinfo() }); read.insert({ name, 0 });}
     void set_rdy(std::string name, bool rdy) {pl[name].rdy = rdy;}
     void set_refuse(std::string name, bool refuse) {pl[name].refuse = refuse;}
     void set_quit(std::string name, bool quit) {pl[name].quit = quit;}
@@ -96,6 +115,7 @@ struct gameinfo
     bool is_refuse(std::string name) {return pl[name].refuse;}
     bool is_quit(std::string name) {return pl[name].quit;}
     void set_ans(std::string name, answer ans) {pl[name].ans = ans;}
+    answer get_ans(std::string name) {return pl[name].ans;}
 };
 
 #pragma endregion

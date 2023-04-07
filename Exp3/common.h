@@ -17,6 +17,7 @@
 #include <string.h>
 
 #define SERV_PORT 12345
+#define USER_NUM 10
 
 #define ERR(exp, msg) if(exp) {error(1, errno, msg);}
 #define STR(str) #str
@@ -25,7 +26,7 @@
 #pragma pack(1)
 
 //用户名
-struct name
+typedef struct name
 {
     char val[15] = { 0 };
     name() {}
@@ -33,11 +34,23 @@ struct name
     name(const std::string& s) {strncpy(val, s.c_str(), 15);}
     name& operator=(const char* s) {strncpy(val, s, 15); return *this;}
     std::string to_string() {return std::string(val);}
-};
-//用户出拳
-enum class answer : uint8_t
+} namepkt;
+//用户状态
+enum class estate : uint8_t
 {
-    rock = 0x00,
+    login = 0x00,
+    game
+};
+//用户
+struct user
+{
+    name n;
+    estate st;
+};
+// 用户出拳
+enum class answer : uint8_t {
+    unknown = 0x00,
+    rock,
     paper,
     scissors
 };
@@ -70,14 +83,14 @@ enum class srvtype : uint8_t
     loginok,
     loginfail,
     gamerequest,
-    gamewait,
     gamerefuse,
     gamestart,
     gameanswer,
     gamequit,
+    gameover,
     userinfo
 };
-//服务器数据包，大小为155字节
+//服务器数据包，大小为165字节
 struct srvpkt
 {
     srvtype type;
@@ -86,7 +99,7 @@ struct srvpkt
     uint8_t score;
     answer ans;
     //以上占用5字节
-    name n[10];
+    user u[USER_NUM];
     void zero() {memset(this, 0, sizeof(srvpkt));}
     srvpkt() {zero();}
 };

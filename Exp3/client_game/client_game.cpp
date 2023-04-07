@@ -1,5 +1,14 @@
 #include "client_game.h"
 
+int stage = 0;
+int res = 0;
+std::map<int, fri> flist;
+int round = 0;
+player self;
+player oppo;
+srvpkt spkt;
+clipkt cpkt;
+
 int client_connect(const char *ip, int port)
 {
     //创建套接字

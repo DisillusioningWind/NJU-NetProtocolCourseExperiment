@@ -51,5 +51,5 @@ int main()
     }
     close(lfd);
     printf("server exit\n");
-    return 0;
+    exit(0);
 }
