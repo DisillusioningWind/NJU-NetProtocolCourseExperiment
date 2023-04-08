@@ -89,17 +89,16 @@ enum class srvtype : uint8_t
     gamestart,
     gameanswer,
     gamequit,
-    //gameover,
     userinfo
 };
 //服务器数据包，大小为165字节
 struct srvpkt
 {
     srvtype type;
-    uint8_t res_num;
     uint8_t round;
-    uint8_t score;
     answer ans;
+    uint8_t score;
+    uint8_t res_num;
     //以上占用5字节
     user u[USER_NUM];
     void zero() {memset(this, 0, sizeof(srvpkt));}
