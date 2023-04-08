@@ -28,6 +28,7 @@ struct fri
 
 extern int stage;
 extern int res;
+extern bool iswaitaccept;
 extern std::map<int, fri> flist;
 extern int round;
 extern int roundres;

@@ -2,6 +2,7 @@
 
 int stage = 0;
 int res = 0;
+bool iswaitaccept = false;
 std::map<int, fri> flist;
 int round = 0;
 int roundres = -1;
@@ -42,7 +43,8 @@ void client_show_menu()
     }
     else if(stage == 2)
     {
-        if(res == 0)
+        //登录成功, 显示好友列表
+        if(res == 0 && !iswaitaccept)
         {
             CLS
             printf("Welcome, %s!\n", self.name.c_str());
@@ -60,7 +62,11 @@ void client_show_menu()
         //有邀请
         else if(res == 4)
         {
-            printf("You have an invitation from %s, do you accept? (y/n)\n", oppo.name.c_str());
+            if(!iswaitaccept)
+            {
+                printf("You have an invitation from %s, do you accept? (y/n)\n", oppo.name.c_str());
+                iswaitaccept = true;
+            }
         }
         //邀请被拒绝
         else if(res == 5)
@@ -71,6 +77,11 @@ void client_show_menu()
         else if(res == 7)
         {
             printf("Your opponent has left the game.\n");
+        }
+        //你不能邀请自己
+        else if(res == 12)
+        {
+            printf("You cannot invite yourself.\n");
         }
     }
     //输入对战用户名
@@ -97,11 +108,11 @@ void client_show_menu()
         {
             CLS
             printf("Round %d ends.\n", round);
-            printf("Your score: %d\n", self.score);
-            printf("Opponent's score: %d\n", oppo.score);
             printf("Your answer: %s\n", self.ans == answer::rock ? "Rock" : self.ans == answer::paper ? "Paper" : self.ans == answer::scissors ? "Scissors" : "Unknown");
             printf("Opponent's answer: %s\n", oppo.ans == answer::rock ? "Rock" : oppo.ans == answer::paper ? "Paper" : oppo.ans == answer::scissors ? "Scissors" : "Unknown");
             printf("Round result: %s\n", roundres == 1 ? "You win" : roundres == 0 ? "You lose" : roundres == 2 ? "Draw" : "Unknown");
+            printf("Your score: %d\n", self.score);
+            printf("Opponent's score: %d\n", oppo.score);
             printf("Press c to continue...\n");
         }
     }
@@ -122,10 +133,19 @@ void client_show_menu()
         {
             CLS
             printf("Game ends.\n");
+            printf("Game result: %s\n", self.score > oppo.score ? "You win" : self.score < oppo.score ? "You lose" : "Draw");
             printf("Your score: %d\n", self.score);
             printf("Opponent's score: %d\n", oppo.score);
-            printf("Game result: %s\n", self.score > oppo.score ? "You win" : self.score < oppo.score ? "You lose" : "Draw");
             printf("Press c to continue...\n");
+        }
+    }
+    //等待对方出拳
+    else if(stage == 7)
+    {
+        //显示自己的出拳
+        if(res == 11)
+        {
+            printf("Your answer: %s\n", self.ans == answer::rock ? "Rock" : self.ans == answer::paper ? "Paper" : self.ans == answer::scissors ? "Scissors" : "Unknown");
         }
     }
     res = 0;

@@ -34,12 +34,14 @@ int main(int argc, char** argv)
                 else if(stage == 2 && spkt.type == srvtype::gamerequest)
                 {
                     oppo.name = spkt.u[0].n.to_string();
-                    res = 4;
+                    if(iswaitaccept) {}
+                    else {res = 4;}
                 }
                 else if(stage == 5 && spkt.type == srvtype::gamerefuse)
                 {
                     stage = 2;
-                    res = 5;
+                    if(spkt.u[0].n.to_string() == self.name) {res = 12;}
+                    else {res = 5;}
                     oppo.zero();
                 }
                 else if(stage == 5 && spkt.type == srvtype::gamestart)
@@ -47,7 +49,7 @@ int main(int argc, char** argv)
                     stage = 4;
                     round = 1;
                 }
-                else if(stage == 4 && spkt.type == srvtype::gameanswer)
+                else if(stage == 7 && spkt.type == srvtype::gameanswer)
                 {
                     round = spkt.round;
                     oppo.ans = spkt.ans;
@@ -58,10 +60,11 @@ int main(int argc, char** argv)
                     }
                     else
                     {
+                        stage = 4;
                         res = 6;
                     }
                 }
-                else if(stage == 4 && spkt.type == srvtype::gamequit)
+                else if((stage == 4 || stage == 7) && spkt.type == srvtype::gamequit)
                 {
                     oppo.zero();
                     stage = 2;
@@ -112,6 +115,7 @@ int main(int argc, char** argv)
                 cpkt.n = oppo.name;
                 send(cfd, &cpkt, sizeof(clipkt), 0);
                 stage = 5;
+                iswaitaccept = false;
                 continue;
             }
             else if(stage == 2 && strncmp(buf, "n", 1) == 0)
@@ -120,6 +124,7 @@ int main(int argc, char** argv)
                 cpkt.n = oppo.name;
                 send(cfd, &cpkt, sizeof(clipkt), 0);
                 stage = 2;
+                iswaitaccept = false;
                 continue;
             }
             else if(stage == 3 && strlen(buf) > 0)
@@ -156,6 +161,7 @@ int main(int argc, char** argv)
                 }
                 else if(strncmp(buf,"c",1) == 0)
                 {
+                    round++;
                     res = 10;
                 }
                 else {res = 1;}
@@ -166,10 +172,13 @@ int main(int argc, char** argv)
                     cpkt.n = self.name;
                     cpkt.ans = self.ans;
                     send(cfd, &cpkt, sizeof(clipkt), 0);
+                    stage = 7;
+                    res = 11;
                 }
                 continue;
             }
             else if(stage == 6){stage = 2;continue;}
+            else if(stage == 7){continue;}
         }
     }
     close(cfd);

@@ -145,6 +145,7 @@ void server_handle(int cfd, int &stage, std::string& name, clipkt &cpkt, srvpkt 
             auto uit = ulist.begin();
             for (;uit != ulist.end() && i < USER_NUM; uit++)
             {
+                if(uit->first == name) continue;
                 spkt.u[i].n = uit->first;
                 spkt.u[i].st = uit->second.st;
                 i++;
@@ -173,6 +174,7 @@ void server_handle(int cfd, int &stage, std::string& name, clipkt &cpkt, srvpkt 
                 spkt.type = srvtype::gamestart;
                 spkt.u[0].n = oppo;
                 spkt.round = 1;
+                uchanged = true;
                 send(cfd, &spkt, sizeof(spkt), 0);
                 spkt.zero();
             }
@@ -193,6 +195,7 @@ void server_handle(int cfd, int &stage, std::string& name, clipkt &cpkt, srvpkt 
                 glist.erase(gid);
                 ulist[name].leave_game();
                 ulist[oppo].leave_game();
+                uchanged = true;
                 spkt.type = srvtype::gamequit;
                 spkt.u[0].n = oppo;
                 send(cfd, &spkt, sizeof(spkt), 0);
@@ -221,6 +224,7 @@ void server_handle(int cfd, int &stage, std::string& name, clipkt &cpkt, srvpkt 
                         glist.erase(gid);
                         ulist[name].leave_game();
                         ulist[oppo].leave_game();
+                        uchanged = true;
                     }
                 }
             }
@@ -242,6 +246,7 @@ void server_handle(int cfd, int &stage, std::string& name, clipkt &cpkt, srvpkt 
         }
         ulist.erase(name);    
         uchanged = true;
+        readcnt.erase(cfd);
         pthread_rwlock_unlock(&rwlock);
         close(cfd);
         pthread_exit(NULL);
@@ -274,7 +279,7 @@ void server_handle(int cfd, int &stage, std::string& name, clipkt &cpkt, srvpkt 
     {
         std::string oppo = cpkt.n.to_string();
         pthread_rwlock_wrlock(&rwlock);
-        if (ulist.find(oppo) != ulist.end() && ulist[oppo].st == estate::login)
+        if (ulist.find(oppo) != ulist.end() && ulist[oppo].st == estate::login && oppo != name)
         {
             //添加对局信息
             int gid = 0;
