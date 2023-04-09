@@ -30,12 +30,12 @@ g++ 9.4.0
 │   ├── server_main.cpp        // 服务器主函数
 │   ├── server_nb.cpp          // 服务器逻辑实现
 │   └── server_nb.h            // 服务器逻辑头文件
-├── 201220064_lab03_report.pdf // 实验报告
 ├── client                     // 客户端程序可执行文件
 ├── common.h                   // 公共头文件
 ├── makefile                   // makefile
 ├── README.md                  // 说明文档
-└── server                     // 服务器程序可执行文件
+├── server                     // 服务器程序可执行文件
+└── ...                        // 其他，如实验报告和协议说明
 ```
 # 运行说明
 ## 编译
