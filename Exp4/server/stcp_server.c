@@ -24,8 +24,18 @@
 // 服务器只有一个seghandler.
 //
 
+server_tcb_t *tcb_list[MAX_TRANSPORT_CONNECTIONS];
+int sip_conn;
+pthread_mutex_t st_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t st_cond = PTHREAD_COND_INITIALIZER;
+
 void stcp_server_init(int conn) {
-  return;
+	for (int i = 0; i < MAX_TRANSPORT_CONNECTIONS; i++) {
+		tcb_list[i] = NULL;
+	}
+	sip_conn = conn;
+	pthread_t thread;
+	pthread_create(&thread, NULL, seghandler, NULL);
 }
 
 // 创建服务器套接字
@@ -36,7 +46,22 @@ void stcp_server_init(int conn) {
 // 如果TCB表中没有条目可用, 这个函数返回-1.
 
 int stcp_server_sock(unsigned int server_port) {
-	return 0;
+	for (int i = 0; i < MAX_TRANSPORT_CONNECTIONS; i++) {
+		if (tcb_list[i] == NULL) {
+			tcb_list[i] = (server_tcb_t *)malloc(sizeof(server_tcb_t));
+			tcb_list[i]->server_nodeID = 0;
+			tcb_list[i]->server_portNum = server_port;
+			tcb_list[i]->client_nodeID = 0;
+			tcb_list[i]->client_portNum = 0;
+			tcb_list[i]->state = CLOSED; 
+			tcb_list[i]->expect_seqNum = 0;
+			tcb_list[i]->recvBuf = NULL;
+			tcb_list[i]->usedBufLen = 0;
+			pthread_mutex_init(&tcb_list[i]->bufMutex, NULL);
+			return i;
+		}
+	}
+	return -1;
 }
 
 // 接受来自STCP客户端的连接
@@ -47,7 +72,16 @@ int stcp_server_sock(unsigned int server_port) {
 //
 
 int stcp_server_accept(int sockfd) {
-	return 0;
+	pthread_mutex_lock(&st_mutex);
+	tcb_list[sockfd]->state = LISTENING;
+	while (tcb_list[sockfd]->state != CONNECTED) {
+		pthread_cond_wait(&st_cond, &st_mutex);
+		if(tcb_list[sockfd]->state == CONNECTED) {
+			pthread_mutex_unlock(&st_mutex);
+			break;
+		}
+	}
+	return 1;
 }
 
 // 接收来自STCP客户端的数据
@@ -65,7 +99,12 @@ int stcp_server_recv(int sockfd, void* buf, unsigned int length) {
 //
 
 int stcp_server_close(int sockfd) {
-	return 0;
+	if (tcb_list[sockfd]->state == CLOSED) {
+		free(tcb_list[sockfd]);
+		tcb_list[sockfd] = NULL;
+		return 1;
+	}
+	return -1;
 }
 
 // 处理进入段的线程
@@ -76,5 +115,73 @@ int stcp_server_close(int sockfd) {
 //
 
 void *seghandler(void* arg) {
-  return 0;
+	while (1) {
+		seg_t seg;
+		if (sip_recvseg(sip_conn, &seg) == -1) {
+			break;
+		}
+		int sockfd = -1;
+		for (int i = 0; i < MAX_TRANSPORT_CONNECTIONS; i++) {
+			if (tcb_list[i] != NULL && tcb_list[i]->server_portNum == seg.header.dest_port) {
+				sockfd = i;
+				break;
+			}
+		}
+		if (sockfd == -1) {
+			continue;
+		}
+		pthread_mutex_lock(&st_mutex);
+		switch (tcb_list[sockfd]->state) {
+			case CLOSED:
+				break;
+			case LISTENING:
+				if (seg.header.type == SYN) {
+					tcb_list[sockfd]->client_portNum = seg.header.src_port;
+					tcb_list[sockfd]->expect_seqNum = seg.header.seq_num + 1;
+					tcb_list[sockfd]->state = CONNECTED;
+					pthread_cond_signal(&st_cond);
+					seg.header.src_port = tcb_list[sockfd]->server_portNum;
+					seg.header.dest_port = seg.header.src_port;
+					seg.header.seq_num = 0;
+					seg.header.ack_num = seg.header.seq_num + 1;
+					seg.header.length = 0;
+					seg.header.type = SYNACK;
+					sip_sendseg(sip_conn, &seg);
+				}
+				break;
+			case CONNECTED:
+				if (seg.header.type == FIN) {
+					tcb_list[sockfd]->state = CLOSEWAIT;
+					seg.header.src_port = tcb_list[sockfd]->server_portNum;
+					seg.header.dest_port = seg.header.src_port;
+					seg.header.seq_num = 0;
+					seg.header.ack_num = seg.header.seq_num + 1;
+					seg.header.length = 0;
+					seg.header.type = FINACK;
+					sip_sendseg(sip_conn, &seg);
+				} else if (seg.header.type == SYN) {
+					seg.header.src_port = tcb_list[sockfd]->server_portNum;
+					seg.header.dest_port = seg.header.src_port;
+					seg.header.seq_num = 0;
+					seg.header.ack_num = seg.header.seq_num + 1;
+					seg.header.length = 0;
+					seg.header.type = SYNACK;
+					sip_sendseg(sip_conn, &seg);
+				}
+				break;
+			case CLOSEWAIT:
+				if (seg.header.type == FIN) {
+					seg.header.src_port = tcb_list[sockfd]->server_portNum;
+					seg.header.dest_port = seg.header.src_port;
+					seg.header.seq_num = 0;
+					seg.header.ack_num = seg.header.seq_num + 1;
+					seg.header.length = 0;
+					seg.header.type = FINACK;
+					sip_sendseg(sip_conn, &seg);
+				}
+				break;
+		}
+		pthread_mutex_unlock(&st_mutex);
+	}
+	return NULL;
 }

@@ -32,10 +32,46 @@
 
 //这个函数通过在客户和服务器之间创建TCP连接来启动重叠网络层. 它返回TCP套接字描述符, STCP将使用该描述符发送段. 如果TCP连接失败, 返回-1.
 int son_start() {
+	int sockfd;
+	struct sockaddr_in servaddr;
+
+	//创建TCP套接字
+	if((sockfd=socket(AF_INET,SOCK_STREAM,0))<0) {
+		printf("can't create TCP socket\n");
+		return -1;
+	}
+
+	//初始化服务器地址
+	memset(&servaddr,0,sizeof(servaddr));
+	servaddr.sin_family=AF_INET;
+	servaddr.sin_port=htons(SON_PORT);
+	servaddr.sin_addr.s_addr=htonl(INADDR_ANY);
+
+	//绑定服务器地址
+	if(bind(sockfd,(struct sockaddr *)&servaddr,sizeof(servaddr))<0) {
+		printf("can't bind\n");
+		return -1;
+	}
+
+	//监听
+	if(listen(sockfd,MAX_TRANSPORT_CONNECTIONS)<0) {
+		printf("can't listen\n");
+		return -1;
+	}
+
+	//接受客户连接
+	int connfd;
+	if((connfd=accept(sockfd,(struct sockaddr *)NULL,NULL))<0) {
+		printf("can't accept\n");
+		return -1;
+	}
+
+	return connfd;
 }
 
 //这个函数通过关闭客户和服务器之间的TCP连接来停止重叠网络层
 void son_stop(int son_conn) {
+	close(son_conn);
 }
 
 int main() {
