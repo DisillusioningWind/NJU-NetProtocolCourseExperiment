@@ -123,7 +123,7 @@ void client_show_menu()
         {
             CLS
             printf("Waiting for the game to start...\n");
-            printf("(3) Left the game, (#) Exit\n");
+            printf("(#) Exit\n");
         }
     }
     //显示游戏结果
