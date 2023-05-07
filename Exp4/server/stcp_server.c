@@ -82,7 +82,7 @@ int stcp_server_accept(int sockfd) {
 		pthread_cond_wait(&st_cond, &st_mutex);
 		if(tcb_list[sockfd]->state == CONNECTED) {
 			pthread_mutex_unlock(&st_mutex);
-			printf("Stcp connect success\n");
+			printf("Server connect success\n");
 			break;
 		}
 	}
@@ -110,7 +110,7 @@ int stcp_server_close(int sockfd) {
 		free(tcb_list[sockfd]);
 		tcb_list[sockfd] = NULL;
 		pthread_mutex_unlock(&st_mutex);
-		printf("Stcp close success\n");
+		printf("Server connect close\n");
 		return 1;
 	}
 	return -1;
@@ -124,35 +124,52 @@ int stcp_server_close(int sockfd) {
 //
 
 void *seghandler(void* arg) {
-	fd_set rset, set;
+	//fd_set rset, set;
 	struct timeval rtv, tv;
-	FD_ZERO(&set);
-	FD_SET(sip_conn, &set);
+	//FD_ZERO(&set);
+	//FD_SET(sip_conn, &set);
 	rtv.tv_sec = CLOSEWAIT_TIMEOUT;
 	rtv.tv_usec = 0;
 
 	while (1) {
-		rset = set;
-		tv = rtv;
-		int ready = select(sip_conn + 1, &rset, NULL, NULL, &tv);
-		//CLOSEWAIT超时
-		if (ready == 0) {
-			for (int i = 0; i < MAX_TRANSPORT_CONNECTIONS; i++) {
-				if (tcb_list[i] != NULL && tcb_list[i]->state == CLOSEWAIT) {
-					tcb_list[i]->state = CLOSED;
+		seg_t seg;
+		int ret;
+
+		ret = sip_recvseg(sip_conn, &seg);
+		if (ret == -1)
+		{
+			printf("recv error in recvmeg\n");
+			return NULL;
+		}
+		else if(ret == -2)
+		{
+			//客户端关闭
+			while (1)
+			{
+				tv = rtv;
+				int ready = select(0, NULL, NULL, NULL, &tv);
+				// CLOSEWAIT超时
+				if (ready == 0)
+				{
+					pthread_mutex_lock(&st_mutex);
+					for (int i = 0; i < MAX_TRANSPORT_CONNECTIONS; i++)
+					{
+						if (tcb_list[i] != NULL && tcb_list[i]->state == CLOSEWAIT)
+						{
+							tcb_list[i]->state = CLOSED;
+							//printf("Server sockfd %d closewait timeout\n", i);
+						}
+					}
+					pthread_mutex_unlock(&st_mutex);
+					continue;
 				}
 			}
+			break;
+		}
+		else if (ret == 1)
+		{
+			//模拟报文丢失
 			continue;
-		}
-		//tcp连接出错
-		if (ready == -1) {
-			printf("recv error\n");
-			break;
-		}
-		//tcp连接正常
-		seg_t seg;
-		if (sip_recvseg(sip_conn, &seg) == -1) {
-			break;
 		}
 		int sockfd = -1;
 		for (int i = 0; i < MAX_TRANSPORT_CONNECTIONS; i++) {
@@ -161,66 +178,60 @@ void *seghandler(void* arg) {
 				break;
 			}
 		}
+		// printf("sockfd = %d\n", sockfd);
 		if (sockfd == -1) {
 			continue;
 		}
 		pthread_mutex_lock(&st_mutex);
-		switch (tcb_list[sockfd]->state) {
-			case CLOSED:
-				break;
-			case LISTENING:
-				if (seg.header.type == SYN) {
-					printf("Server recv SYN\n");
-					tcb_list[sockfd]->client_portNum = seg.header.src_port;
-					tcb_list[sockfd]->expect_seqNum = seg.header.seq_num + 1;
-					tcb_list[sockfd]->state = CONNECTED;
-					pthread_cond_signal(&st_cond);
-					seg.header.src_port = tcb_list[sockfd]->server_portNum;
-					seg.header.dest_port = seg.header.src_port;
-					seg.header.seq_num = 0;
-					seg.header.ack_num = seg.header.seq_num + 1;
-					seg.header.length = 0;
-					seg.header.type = SYNACK;
-					sip_sendseg(sip_conn, &seg);
-					printf("Server send SYNACK\n");
-				}
-				break;
-			case CONNECTED:
-				if (seg.header.type == FIN) {
-					printf("Server recv FIN\n");
-					tcb_list[sockfd]->state = CLOSEWAIT;
-					seg.header.src_port = tcb_list[sockfd]->server_portNum;
-					seg.header.dest_port = seg.header.src_port;
-					seg.header.seq_num = 0;
-					seg.header.ack_num = seg.header.seq_num + 1;
-					seg.header.length = 0;
-					seg.header.type = FINACK;
-					sip_sendseg(sip_conn, &seg);
-					printf("Server send FINACK\n");
-				}
-				else if (seg.header.type == SYN) {
-					seg.header.src_port = tcb_list[sockfd]->server_portNum;
-					seg.header.dest_port = seg.header.src_port;
-					seg.header.seq_num = 0;
-					seg.header.ack_num = seg.header.seq_num + 1;
-					seg.header.length = 0;
-					seg.header.type = SYNACK;
-					sip_sendseg(sip_conn, &seg);
-				}
-				break;
-			case CLOSEWAIT:
-				if (seg.header.type == FIN) {
-					printf("Server recv FIN\n");
-					seg.header.src_port = tcb_list[sockfd]->server_portNum;
-					seg.header.dest_port = seg.header.src_port;
-					seg.header.seq_num = 0;
-					seg.header.ack_num = seg.header.seq_num + 1;
-					seg.header.length = 0;
-					seg.header.type = FINACK;
-					sip_sendseg(sip_conn, &seg);
-					printf("Server send FINACK\n");
-				}
-				break;
+		switch (tcb_list[sockfd]->state)
+		{
+		case CLOSED:
+			break;
+		case LISTENING:
+			if (seg.header.type == SYN)
+			{
+				printf("Server recv SYN\n");
+				tcb_list[sockfd]->client_portNum = seg.header.src_port;
+				tcb_list[sockfd]->expect_seqNum = seg.header.seq_num + 1;
+				tcb_list[sockfd]->state = CONNECTED;
+				pthread_cond_signal(&st_cond);
+				seg.header.src_port = tcb_list[sockfd]->server_portNum;
+				seg.header.dest_port = tcb_list[sockfd]->client_portNum;
+				seg.header.type = SYNACK;
+				sip_sendseg(sip_conn, &seg);
+				printf("Server send SYNACK\n");
+			}
+			break;
+		case CONNECTED:
+			if (seg.header.type == FIN)
+			{
+				printf("Server recv FIN\n");
+				tcb_list[sockfd]->state = CLOSEWAIT;
+				seg.header.src_port = tcb_list[sockfd]->server_portNum;
+				seg.header.dest_port = tcb_list[sockfd]->client_portNum;
+				seg.header.type = FINACK;
+				sip_sendseg(sip_conn, &seg);
+				printf("Server send FINACK\n");
+			}
+			else if (seg.header.type == SYN)
+			{
+				seg.header.src_port = tcb_list[sockfd]->server_portNum;
+				seg.header.dest_port = tcb_list[sockfd]->client_portNum;
+				seg.header.type = SYNACK;
+				sip_sendseg(sip_conn, &seg);
+			}
+			break;
+		case CLOSEWAIT:
+			if (seg.header.type == FIN)
+			{
+				printf("Server recv FIN\n");
+				seg.header.src_port = tcb_list[sockfd]->server_portNum;
+				seg.header.dest_port = tcb_list[sockfd]->client_portNum;
+				seg.header.type = FINACK;
+				sip_sendseg(sip_conn, &seg);
+				printf("Server send FINACK\n");
+			}
+			break;
 		}
 		pthread_mutex_unlock(&st_mutex);
 	}

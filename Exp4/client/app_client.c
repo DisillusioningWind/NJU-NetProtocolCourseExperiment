@@ -33,10 +33,6 @@ int son_start() {
 	int sockfd, rt;
 	//创建TCP套接字
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
-	if(sockfd<0) {
-		printf("fail to create socket\n");
-		return -1;
-	}
 	//填充客户端套接字地址
 	struct sockaddr_in servaddr;
 	memset(&servaddr,0,sizeof(servaddr));
@@ -45,11 +41,7 @@ int son_start() {
 	inet_pton(AF_INET, "127.0.0.1", &servaddr.sin_addr);
 	//连接到服务器
 	rt = connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr));
-	if(rt<0) {
-		printf("fail to connect to server\n");
-		return -1;
-	}
-	return rt > 0 ? sockfd : -1;
+	return rt >= 0 ? sockfd : -1;
 }
 
 //这个函数通过关闭客户和服务器之间的TCP连接来停止重叠网络层

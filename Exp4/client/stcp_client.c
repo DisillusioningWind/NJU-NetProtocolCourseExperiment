@@ -93,17 +93,14 @@ int stcp_client_connect(int sockfd, unsigned int server_port) {
   seg_t seg;
   seg.header.src_port = tcb_list[sockfd]->client_portNum;
   seg.header.dest_port = tcb_list[sockfd]->server_portNum;
-  seg.header.seq_num = tcb_list[sockfd]->next_seqNum;
-  seg.header.ack_num = 0;
-  seg.header.length = 0;
   seg.header.type = SYN;
-  seg.header.rcv_win = 0;
-  seg.header.checksum = 0;
 
   if (sip_sendseg(sip_conn, &seg) < 0) {
     printf("stcp_client_connect: sip_sendseg error\n");
     return -1;
   }
+  printf("Client send SYN\n");
+
   tcb_list[sockfd]->state = SYNSENT;
   int retry = 0;
   struct timeval tv, rtv;
@@ -122,10 +119,12 @@ int stcp_client_connect(int sockfd, unsigned int server_port) {
       printf("stcp_client_connect: sip_sendseg error\n");
       return -1;
     }
+    printf("Client send SYN\n");
     pthread_mutex_unlock(tcb_list[sockfd]->bufMutex);
     retry++;
   }
   tcb_list[sockfd]->state = CLOSED;
+  printf("Client retry exceed\n");
   return -1;
 }
 
@@ -169,6 +168,8 @@ int stcp_client_disconnect(int sockfd) {
     printf("stcp_client_disconnect: sip_sendseg error\n");
     return -1;
   }
+  printf("Client send FIN\n");
+
   tcb_list[sockfd]->state = FINWAIT;
   int retry = 0;
   struct timeval tv, rtv;
@@ -181,16 +182,20 @@ int stcp_client_disconnect(int sockfd) {
     pthread_mutex_lock(tcb_list[sockfd]->bufMutex);
     if (tcb_list[sockfd]->state == CLOSED) {
       pthread_mutex_unlock(tcb_list[sockfd]->bufMutex);
+      printf("Client connect closed\n");
       return 1;
     }
     if (sip_sendseg(sip_conn, &seg) < 0) {
       printf("stcp_client_disconnect: sip_sendseg error\n");
       return -1;
     }
+    printf("Client send FIN\n");
     pthread_mutex_unlock(tcb_list[sockfd]->bufMutex);
     retry++;
   }
   tcb_list[sockfd]->state = CLOSED;
+  printf("Client FIN retry exceed\n");
+  printf("Client connect closed\n");
   return -1;
 }
 
@@ -237,7 +242,7 @@ void *seghandler(void* arg) {
   while (1) {
     tv = rtv;
     rset = set;
-    res = select(sip_conn + 1, &rset, NULL, NULL, &tv);
+    res = select(sip_conn + 1, &rset, NULL, NULL, NULL);
     if (res < 0) {
       printf("seghandler: select error\n");
       return NULL;
@@ -247,10 +252,20 @@ void *seghandler(void* arg) {
     }
     if (FD_ISSET(sip_conn, &rset)) {
       seg_t seg;
-      if (sip_recvseg(sip_conn, &seg) < 0) {
+      int res = sip_recvseg(sip_conn, &seg);
+      if (res == -1) {
         printf("seghandler: sip_recvseg error\n");
         return NULL;
       }
+      else if(res == -2) {
+        printf("Server has been closed\n");
+        return NULL;
+      }
+      else if(res == 1) {
+        //模拟丢包
+        continue;
+      }
+      
       int sockfd = -1;
       for (int i = 0; i < MAX_TRANSPORT_CONNECTIONS; i++) {
         if (tcb_list[i] != NULL && tcb_list[i]->client_portNum == seg.header.dest_port) {
@@ -269,16 +284,16 @@ void *seghandler(void* arg) {
           if (seg.header.type == SYNACK) {
             tcb_list[sockfd]->state = CONNECTED;
             tcb_list[sockfd]->server_portNum = seg.header.src_port;
-            printf("SYNACK received\n");
+            printf("Clinet recv SYNACK\n");
           }
           break;
         case CONNECTED:
-          //nothing to do
+          //to do
           break;
         case FINWAIT:
           if (seg.header.type == FINACK) {
             tcb_list[sockfd]->state = CLOSED;
-            printf("FINACK received\n");
+            printf("Client recv FINACK\n");
           }
           break;
       }
