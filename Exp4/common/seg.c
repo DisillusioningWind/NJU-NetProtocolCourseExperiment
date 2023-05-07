@@ -85,8 +85,7 @@ int sip_recvseg(int connection, seg_t *segPtr)
 			state = SEGRECV2;
 			break;
 		case SEGRECV2:
-			int len = segPtr->header.length;
-			res = recv(connection, segPtr->data, len, 0);
+			res = recv(connection, segPtr->data, segPtr->header.length, 0);
 			state = SEGSTOP1;
 			break;
 		case SEGSTOP1:

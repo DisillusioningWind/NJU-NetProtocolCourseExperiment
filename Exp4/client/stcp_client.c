@@ -26,7 +26,18 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //
 
+client_tcb_t *tcb_list[MAX_TRANSPORT_CONNECTIONS];
+int sip_conn;
+pthread_mutex_t st_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t st_cond = PTHREAD_COND_INITIALIZER;
+
 void stcp_client_init(int conn) {
+  for (int i = 0; i < MAX_TRANSPORT_CONNECTIONS; i++) {
+    tcb_list[i] = NULL;
+  }
+  sip_conn = conn;
+  pthread_t thread;
+  pthread_create(&thread, NULL, seghandler, NULL);
   return;
 }
 
@@ -41,6 +52,25 @@ void stcp_client_init(int conn) {
 //
 
 int stcp_client_sock(unsigned int client_port) {
+  for (int i = 0; i < MAX_TRANSPORT_CONNECTIONS; i++) {
+    if (tcb_list[i] == NULL) {
+      client_tcb_t *tcb = (client_tcb_t *)malloc(sizeof(client_tcb_t));
+      tcb->server_nodeID = 0;
+      tcb->server_portNum = 0;
+      tcb->client_nodeID = 0;
+      tcb->client_portNum = client_port;
+      tcb->state = CLOSED;
+      tcb->next_seqNum = 0;
+      tcb->bufMutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+      pthread_mutex_init(tcb->bufMutex, NULL);
+      tcb->sendBufHead = NULL;
+      tcb->sendBufunSent = NULL;
+      tcb->sendBufTail = NULL;
+      tcb->unAck_segNum = 0;
+      tcb_list[i] = tcb;
+      return i;
+    }
+  }
   return 0;
 }
 
@@ -55,7 +85,48 @@ int stcp_client_sock(unsigned int client_port) {
 //
 
 int stcp_client_connect(int sockfd, unsigned int server_port) {
-  return 0;
+  if(sockfd < 0 || sockfd >= MAX_TRANSPORT_CONNECTIONS || tcb_list[sockfd] == NULL) {
+    printf("stcp_client_connect: sockfd error\n");
+    return -1;
+  }
+  tcb_list[sockfd]->server_portNum = server_port;
+  seg_t seg;
+  seg.header.src_port = tcb_list[sockfd]->client_portNum;
+  seg.header.dest_port = tcb_list[sockfd]->server_portNum;
+  seg.header.seq_num = tcb_list[sockfd]->next_seqNum;
+  seg.header.ack_num = 0;
+  seg.header.length = 0;
+  seg.header.type = SYN;
+  seg.header.rcv_win = 0;
+  seg.header.checksum = 0;
+
+  if (sip_sendseg(sip_conn, &seg) < 0) {
+    printf("stcp_client_connect: sip_sendseg error\n");
+    return -1;
+  }
+  tcb_list[sockfd]->state = SYNSENT;
+  int retry = 0;
+  struct timeval tv, rtv;
+  rtv.tv_sec = 0;
+  rtv.tv_usec = SYN_TIMEOUT / 1000;//1us = 1000ns
+  while (retry < SYN_MAX_RETRY)
+  {
+    tv = rtv;
+    select(0, NULL, NULL, NULL, &tv);
+    pthread_mutex_lock(tcb_list[sockfd]->bufMutex);
+    if (tcb_list[sockfd]->state == CONNECTED) {
+      pthread_mutex_unlock(tcb_list[sockfd]->bufMutex);
+      return 1;
+    }
+    if (sip_sendseg(sip_conn, &seg) < 0) {
+      printf("stcp_client_connect: sip_sendseg error\n");
+      return -1;
+    }
+    pthread_mutex_unlock(tcb_list[sockfd]->bufMutex);
+    retry++;
+  }
+  tcb_list[sockfd]->state = CLOSED;
+  return -1;
 }
 
 // 发送数据给STCP服务器
@@ -80,7 +151,47 @@ int stcp_client_send(int sockfd, void* data, unsigned int length) {
 //
 
 int stcp_client_disconnect(int sockfd) {
-  return 0;
+  if(sockfd < 0 || sockfd >= MAX_TRANSPORT_CONNECTIONS || tcb_list[sockfd] == NULL) {
+    printf("stcp_client_disconnect: sockfd error\n");
+    return -1;
+  }
+  seg_t seg;
+  seg.header.src_port = tcb_list[sockfd]->client_portNum;
+  seg.header.dest_port = tcb_list[sockfd]->server_portNum;
+  seg.header.seq_num = tcb_list[sockfd]->next_seqNum;
+  seg.header.ack_num = 0;
+  seg.header.length = 0;
+  seg.header.type = FIN;
+  seg.header.rcv_win = 0;
+  seg.header.checksum = 0;
+
+  if (sip_sendseg(sip_conn, &seg) < 0) {
+    printf("stcp_client_disconnect: sip_sendseg error\n");
+    return -1;
+  }
+  tcb_list[sockfd]->state = FINWAIT;
+  int retry = 0;
+  struct timeval tv, rtv;
+  rtv.tv_sec = 0;
+  rtv.tv_usec = FIN_TIMEOUT / 1000;//1us = 1000ns
+  while (retry < FIN_MAX_RETRY)
+  {
+    tv = rtv;
+    select(0, NULL, NULL, NULL, &tv);
+    pthread_mutex_lock(tcb_list[sockfd]->bufMutex);
+    if (tcb_list[sockfd]->state == CLOSED) {
+      pthread_mutex_unlock(tcb_list[sockfd]->bufMutex);
+      return 1;
+    }
+    if (sip_sendseg(sip_conn, &seg) < 0) {
+      printf("stcp_client_disconnect: sip_sendseg error\n");
+      return -1;
+    }
+    pthread_mutex_unlock(tcb_list[sockfd]->bufMutex);
+    retry++;
+  }
+  tcb_list[sockfd]->state = CLOSED;
+  return -1;
 }
 
 // 关闭STCP客户
@@ -92,7 +203,17 @@ int stcp_client_disconnect(int sockfd) {
 //
 
 int stcp_client_close(int sockfd) {
-	return 0;
+  if(sockfd < 0 || sockfd >= MAX_TRANSPORT_CONNECTIONS || tcb_list[sockfd] == NULL) {
+    printf("stcp_client_close: sockfd error\n");
+    return -1;
+  }
+  if (tcb_list[sockfd]->state == CLOSED) {
+    free(tcb_list[sockfd]->bufMutex);
+    free(tcb_list[sockfd]);
+    tcb_list[sockfd] = NULL;
+    return 1;
+  }
+  return -1;
 }
 
 // 处理进入段的线程
@@ -105,6 +226,64 @@ int stcp_client_close(int sockfd) {
 //
 
 void *seghandler(void* arg) {
+  fd_set rset, set;
+  struct timeval rtv, tv;
+  int res;
+  FD_ZERO(&set);
+  FD_SET(sip_conn, &set);
+  rtv.tv_sec = 0;
+  rtv.tv_usec = SYN_TIMEOUT / 1000;//1us = 1000ns
+
+  while (1) {
+    tv = rtv;
+    rset = set;
+    res = select(sip_conn + 1, &rset, NULL, NULL, &tv);
+    if (res < 0) {
+      printf("seghandler: select error\n");
+      return NULL;
+    }
+    else if (res == 0) {
+      continue;
+    }
+    if (FD_ISSET(sip_conn, &rset)) {
+      seg_t seg;
+      if (sip_recvseg(sip_conn, &seg) < 0) {
+        printf("seghandler: sip_recvseg error\n");
+        return NULL;
+      }
+      int sockfd = -1;
+      for (int i = 0; i < MAX_TRANSPORT_CONNECTIONS; i++) {
+        if (tcb_list[i] != NULL && tcb_list[i]->client_portNum == seg.header.dest_port) {
+          sockfd = i;
+          break;
+        }
+      }
+      if (sockfd < 0) {
+        printf("seghandler: get_sockfd error\n");
+        return NULL;
+      }
+      switch(tcb_list[sockfd]->state) {
+        case CLOSED:
+          break;
+        case SYNSENT:
+          if (seg.header.type == SYNACK) {
+            tcb_list[sockfd]->state = CONNECTED;
+            tcb_list[sockfd]->server_portNum = seg.header.src_port;
+            printf("SYNACK received\n");
+          }
+          break;
+        case CONNECTED:
+          //nothing to do
+          break;
+        case FINWAIT:
+          if (seg.header.type == FINACK) {
+            tcb_list[sockfd]->state = CLOSED;
+            printf("FINACK received\n");
+          }
+          break;
+      }
+    }
+  }
   return 0;
 }
 
