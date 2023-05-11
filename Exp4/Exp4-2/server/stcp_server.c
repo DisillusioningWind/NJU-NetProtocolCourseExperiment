@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <pthread.h>
+#include <string.h>
 #include "stcp_server.h"
 #include "../common/constants.h"
 
@@ -138,7 +139,7 @@ void* seghandler(void* arg)
     if (ret == -1)
     {
       //重叠网络连接关闭或出错
-      printf("Server sip connect closed or error\n");
+      printf("Server sip connect closed\n");
       return NULL;
     }
     else if (ret == 1)
@@ -213,6 +214,7 @@ void* seghandler(void* arg)
       else if(seg.header.type == DATA)
       {
         //接收到数据段
+        printf("seq_num = %d, expect_seqNum = %d\n", seg.header.seq_num, tcb_list[sockfd]->expect_seqNum);
         if (seg.header.seq_num == tcb_list[sockfd]->expect_seqNum)
         {
           printf("Server recv DATA\n");
@@ -280,7 +282,7 @@ void *timer_thread(void *arg)
         {
           tcb_list[i]->state = CLOSED;
           tcb_list[i]->usedBufLen = 0;
-          printf("Server sockfd %d closewait timeout\n", i);
+          // printf("Server sockfd %d closewait timeout\n", i);
         }
       }
       pthread_mutex_unlock(&st_mutex);
