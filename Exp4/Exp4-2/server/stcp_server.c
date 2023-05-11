@@ -1,58 +1,77 @@
 // 文件名: stcp_server.c
-//
 // 描述: 这个文件包含服务器STCP套接字接口定义. 你需要实现所有这些接口.
 
 #include <stdlib.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <stdio.h>
 #include <time.h>
 #include <pthread.h>
 #include "stcp_server.h"
 #include "../common/constants.h"
 
-//
-//  用于服务器程序的STCP套接字API. 
-//  ===================================
-//
-//  我们在下面提供了每个函数调用的原型定义和细节说明, 但这些只是指导性的, 你完全可以根据自己的想法来设计代码.
-//
-//  注意: 当实现这些函数时, 你需要考虑FSM中所有可能的状态, 这可以使用switch语句来实现. 
-//
-//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-//
+int sip_conn;                                         //重叠网络层TCP套接字描述符
+server_tcb_t *tcb_list[MAX_TRANSPORT_CONNECTIONS];    //服务器端TCB表
+pthread_mutex_t st_mutex = PTHREAD_MUTEX_INITIALIZER; //TCB表访问互斥锁
+pthread_cond_t st_cond = PTHREAD_COND_INITIALIZER;    //TCB表访问条件变量
 
-// 这个函数初始化TCB表, 将所有条目标记为NULL. 它还针对重叠网络TCP套接字描述符conn初始化一个STCP层的全局变量, 
-// 该变量作为sip_sendseg和sip_recvseg的输入参数. 最后, 这个函数启动seghandler线程来处理进入的STCP段.
-// 服务器只有一个seghandler.
-//
-//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-//
+/// @brief 初始化服务器TCB表
+/// @param conn 重叠网络TCP套接字描述符
 void stcp_server_init(int conn)
 {
-  return;
+  for (int i = 0; i < MAX_TRANSPORT_CONNECTIONS; i++)
+  {
+    tcb_list[i] = NULL;
+  }
+  sip_conn = conn;
+  pthread_t thread_seg, thread_timer;
+  pthread_create(&thread_seg, NULL, seghandler, NULL);
+  pthread_create(&thread_timer, NULL, timer_thread, NULL);
 }
 
-// 这个函数查找服务器TCB表以找到第一个NULL条目, 然后使用malloc()为该条目创建一个新的TCB条目.
-// 该TCB中的所有字段都被初始化, 例如, TCB state被设置为CLOSED, 服务器端口被设置为函数调用参数server_port. 
-// TCB表中条目的索引应作为服务器的新套接字ID被这个函数返回, 它用于标识服务器的连接. 
-// 如果TCB表中没有条目可用, 这个函数返回-1.
-//
-//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-//
+/// @brief 创建STCP服务器套接字
+/// @param server_port 服务器端口号
+/// @retval >=0 创建成功，返回服务器TCB表中的条目索引
+/// @retval -1 创建失败
 int stcp_server_sock(unsigned int server_port)
 {
-  return 0;
+  for (int i = 0; i < MAX_TRANSPORT_CONNECTIONS; i++)
+  {
+    if (tcb_list[i] == NULL)
+    {
+      tcb_list[i] = (server_tcb_t *)malloc(sizeof(server_tcb_t));
+      tcb_list[i]->server_portNum = server_port;
+      tcb_list[i]->client_portNum = 0;
+      tcb_list[i]->state = CLOSED;
+      tcb_list[i]->expect_seqNum = 0;
+      tcb_list[i]->recvBuf = (char *)malloc(sizeof(char) * RECEIVE_BUF_SIZE);
+      tcb_list[i]->usedBufLen = 0;
+      tcb_list[i]->bufMutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+      pthread_mutex_init(tcb_list[i]->bufMutex, NULL);
+      return i;
+    }
+  }
+  return -1;
 }
 
-// 这个函数使用sockfd获得TCB指针, 并将连接的state转换为LISTENING. 它然后启动定时器进入忙等待直到TCB状态转换为CONNECTED 
-// (当收到SYN时, seghandler会进行状态的转换). 该函数在一个无穷循环中等待TCB的state转换为CONNECTED,  
-// 当发生了转换时, 该函数返回1. 你可以使用不同的方法来实现这种阻塞等待.
-//
-//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-//
+/// @brief 监听来自STCP客户端的连接
+/// @param sockfd STCP套接字描述符
+/// @return 1 连接成功
 int stcp_server_accept(int sockfd)
 {
-  return 0;
+  pthread_mutex_lock(&st_mutex);
+  tcb_list[sockfd]->state = LISTENING;
+  while (tcb_list[sockfd]->state != CONNECTED)
+  {
+    pthread_cond_wait(&st_cond, &st_mutex);
+    if (tcb_list[sockfd]->state == CONNECTED)
+    {
+      pthread_mutex_unlock(&st_mutex);
+      printf("Server connect success, client port:%d, server port:%d\n", tcb_list[sockfd]->client_portNum, tcb_list[sockfd]->server_portNum);
+      break;
+    }
+  }
+  return 1;
 }
 
 // 接收来自STCP客户端的数据. 请回忆STCP使用的是单向传输, 数据从客户端发送到服务器端.
@@ -66,24 +85,149 @@ int stcp_server_recv(int sockfd, void* buf, unsigned int length)
   return 0;
 }
 
-// 这个函数调用free()释放TCB条目. 它将该条目标记为NULL, 成功时(即位于正确的状态)返回1,
-// 失败时(即位于错误的状态)返回-1.
-//
-//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-//
+/// @brief 关闭STCP服务器套接字
+/// @param sockfd STCP套接字描述符
+/// @retval 1 关闭成功
+/// @retval -1 关闭失败
 int stcp_server_close(int sockfd)
 {
-  return 0;
+  if (tcb_list[sockfd]->state == CLOSED)
+  {
+    int cli_port = tcb_list[sockfd]->client_portNum;
+    pthread_mutex_lock(&st_mutex);
+    free(tcb_list[sockfd]->bufMutex);
+    free(tcb_list[sockfd]->recvBuf);
+    free(tcb_list[sockfd]);
+    tcb_list[sockfd] = NULL;
+    pthread_mutex_unlock(&st_mutex);
+    printf("Server connect close, client port:%d\n", cli_port);
+    return 1;
+  }
+  return -1;
 }
 
-// 这是由stcp_server_init()启动的线程. 它处理所有来自客户端的进入数据. seghandler被设计为一个调用sip_recvseg()的无穷循环, 
-// 如果sip_recvseg()失败, 则说明重叠网络连接已关闭, 线程将终止. 根据STCP段到达时连接所处的状态, 可以采取不同的动作.
-// 请查看服务端FSM以了解更多细节.
-//
-//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-//
+/// @brief 处理接收到的STCP段
 void* seghandler(void* arg)
 {
-  return;
+  struct timeval rtv, tv;
+  tv.tv_sec = CLOSEWAIT_TIMEOUT;
+  tv.tv_usec = 0;
+  while (1)
+  {
+    seg_t seg;
+    int ret;
+    ret = sip_recvseg(sip_conn, &seg);
+    if (ret == -1)
+    {
+      //重叠网络连接关闭或出错
+      printf("Server sip connect closed or error\n");
+      return NULL;
+    }
+    else if (ret == 1)
+    {
+      //报文丢失
+      continue;
+    }
+    //接收成功
+    int sockfd = -1;
+    for (int i = 0; i < MAX_TRANSPORT_CONNECTIONS; i++)
+    {
+      if (tcb_list[i] != NULL && tcb_list[i]->server_portNum == seg.header.dest_port)
+      {
+        sockfd = i;
+        break;
+      }
+    }
+    // printf("sockfd = %d\n", sockfd);
+    if (sockfd == -1)
+    {
+      printf("Server sockfd error\n");
+      continue;
+    }
+    pthread_mutex_lock(&st_mutex);
+    switch (tcb_list[sockfd]->state)
+    {
+    case CLOSED:
+      break;
+    case LISTENING:
+      if (seg.header.type == SYN)
+      {
+        printf("Server recv SYN\n");
+        tcb_list[sockfd]->client_portNum = seg.header.src_port;
+        tcb_list[sockfd]->expect_seqNum = seg.header.seq_num + 1;
+        tcb_list[sockfd]->state = CONNECTED;
+        pthread_cond_signal(&st_cond);
+        seg.header.src_port = tcb_list[sockfd]->server_portNum;
+        seg.header.dest_port = tcb_list[sockfd]->client_portNum;
+        seg.header.type = SYNACK;
+        sip_sendseg(sip_conn, &seg);
+        printf("Server send SYNACK\n");
+      }
+      break;
+    case CONNECTED:
+      if (seg.header.type == FIN)
+      {
+        printf("Server recv FIN\n");
+        tcb_list[sockfd]->state = CLOSEWAIT;
+        seg.header.src_port = tcb_list[sockfd]->server_portNum;
+        seg.header.dest_port = tcb_list[sockfd]->client_portNum;
+        seg.header.type = FINACK;
+        sip_sendseg(sip_conn, &seg);
+        printf("Server send FINACK\n");
+      }
+      else if (seg.header.type == SYN)
+      {
+        seg.header.src_port = tcb_list[sockfd]->server_portNum;
+        seg.header.dest_port = tcb_list[sockfd]->client_portNum;
+        seg.header.type = SYNACK;
+        sip_sendseg(sip_conn, &seg);
+      }
+      break;
+    case CLOSEWAIT:
+      if (seg.header.type == FIN)
+      {
+        printf("Server recv FIN\n");
+        seg.header.src_port = tcb_list[sockfd]->server_portNum;
+        seg.header.dest_port = tcb_list[sockfd]->client_portNum;
+        seg.header.type = FINACK;
+        sip_sendseg(sip_conn, &seg);
+        printf("Server send FINACK\n");
+      }
+      break;
+    }
+    pthread_mutex_unlock(&st_mutex);
+  }
+  return NULL;
 }
 
+/// @brief 定时器线程，处理CLOSEWAIT状态的超时
+void *timer_thread(void *arg)
+{
+  struct timeval rtv, tv;
+  tv.tv_sec = CLOSEWAIT_TIMEOUT;
+  tv.tv_usec = 0;
+  while (1)
+  {
+    rtv = tv;
+    if (select(0, NULL, NULL, NULL, &rtv) == 0)
+    {
+      //CLOSEWAIT超时
+      pthread_mutex_lock(&st_mutex);
+      for (int i = 0; i < MAX_TRANSPORT_CONNECTIONS; i++)
+      {
+        if (tcb_list[i] != NULL && tcb_list[i]->state == CLOSEWAIT)
+        {
+          tcb_list[i]->state = CLOSED;
+          printf("Server sockfd %d closewait timeout\n", i);
+        }
+      }
+      pthread_mutex_unlock(&st_mutex);
+    }
+    else
+    {
+      printf("Server timer_thread select error\n");
+      return NULL;
+    }
+  }
+  return NULL;
+}

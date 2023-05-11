@@ -34,8 +34,7 @@ int sip_sendseg(int connection, seg_t* segPtr)
 /// @param segPtr 用于接收的STCP段指针
 /// @retval 1: 丢弃接收到的STCP段
 /// @retval 0: 接收到正确的STCP段
-/// @retval -1: TCP连接出错
-/// @retval -2: TCP连接已关闭
+/// @retval -1: TCP连接出错或已关闭
 int sip_recvseg(int connection, seg_t* segPtr)
 {
 	int res = 1, check = 1;
@@ -84,7 +83,7 @@ int sip_recvseg(int connection, seg_t* segPtr)
 				return -1;
 		}
 	}
-	return res == 0 ? -2 : -1;
+	return -1;
 }
 
 int seglost(seg_t* segPtr) {

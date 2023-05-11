@@ -1,5 +1,4 @@
 // 文件名: stcp_server.h
-//
 // 描述: 这个文件包含服务器状态定义, 一些重要的数据结构和服务器STCP套接字接口定义. 你需要实现所有这些接口.
 
 #ifndef STCPSERVER_H
@@ -39,7 +38,6 @@ typedef struct server_tcb {
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //
 
-void stcp_server_init(int conn);
 
 // 这个函数初始化TCB表, 将所有条目标记为NULL. 它还针对重叠网络TCP套接字描述符conn初始化一个STCP层的全局变量, 
 // 该变量作为sip_sendseg和sip_recvseg的输入参数. 最后, 这个函数启动seghandler线程来处理进入的STCP段.
@@ -48,7 +46,7 @@ void stcp_server_init(int conn);
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //
 
-int stcp_server_sock(unsigned int server_port);
+void stcp_server_init(int conn);
 
 // 这个函数查找服务器TCB表以找到第一个NULL条目, 然后使用malloc()为该条目创建一个新的TCB条目.
 // 该TCB中的所有字段都被初始化, 例如, TCB state被设置为CLOSED, 服务器端口被设置为函数调用参数server_port. 
@@ -58,7 +56,7 @@ int stcp_server_sock(unsigned int server_port);
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //
 
-int stcp_server_accept(int sockfd);
+int stcp_server_sock(unsigned int server_port);
 
 // 这个函数使用sockfd获得TCB指针, 并将连接的state转换为LISTENING. 它然后启动定时器进入忙等待直到TCB状态转换为CONNECTED 
 // (当收到SYN时, seghandler会进行状态的转换). 该函数在一个无穷循环中等待TCB的state转换为CONNECTED,  
@@ -67,7 +65,7 @@ int stcp_server_accept(int sockfd);
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //
 
-int stcp_server_recv(int sockfd, void* buf, unsigned int length);
+int stcp_server_accept(int sockfd);
 
 // 接收来自STCP客户端的数据. 请回忆STCP使用的是单向传输, 数据从客户端发送到服务器端.
 // 信号/控制信息(如SYN, SYNACK等)则是双向传递. 这个函数每隔RECVBUF_POLLING_INTERVAL时间
@@ -78,7 +76,7 @@ int stcp_server_recv(int sockfd, void* buf, unsigned int length);
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //
 
-int stcp_server_close(int sockfd);
+int stcp_server_recv(int sockfd, void* buf, unsigned int length);
 
 // 这个函数调用free()释放TCB条目. 它将该条目标记为NULL, 成功时(即位于正确的状态)返回1,
 // 失败时(即位于错误的状态)返回-1.
@@ -86,7 +84,7 @@ int stcp_server_close(int sockfd);
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //
 
-void* seghandler(void* arg);
+int stcp_server_close(int sockfd);
 
 // 这是由stcp_server_init()启动的线程. 它处理所有来自客户端的进入数据. seghandler被设计为一个调用sip_recvseg()的无穷循环, 
 // 如果sip_recvseg()失败, 则说明重叠网络连接已关闭, 线程将终止. 根据STCP段到达时连接所处的状态, 可以采取不同的动作.
@@ -95,4 +93,8 @@ void* seghandler(void* arg);
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //
 
+void* seghandler(void* arg);
+
+
+void* timer_thread(void* arg);
 #endif
