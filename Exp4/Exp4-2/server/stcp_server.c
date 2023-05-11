@@ -74,15 +74,33 @@ int stcp_server_accept(int sockfd)
   return 1;
 }
 
-// 接收来自STCP客户端的数据. 请回忆STCP使用的是单向传输, 数据从客户端发送到服务器端.
-// 信号/控制信息(如SYN, SYNACK等)则是双向传递. 这个函数每隔RECVBUF_ROLLING_INTERVAL时间
-// 就查询接收缓冲区, 直到等待的数据到达, 它然后存储数据并返回1. 如果这个函数失败, 则返回-1.
-//
-//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-//
+/// @brief 从STCP服务器套接字接收数据
+/// @param sockfd STCP套接字描述符
+/// @param buf 接收数据缓冲区
+/// @param length 接收数据长度
+/// @retval 1 接收成功
+/// @retval -1 接收失败
 int stcp_server_recv(int sockfd, void* buf, unsigned int length)
 {
-  return 0;
+  struct timeval rtv, tv;
+  tv.tv_sec = RECVBUF_POLLING_INTERVAL;
+  tv.tv_usec = 0;
+  while (1)
+  {
+    pthread_mutex_lock(tcb_list[sockfd]->bufMutex);
+    if (tcb_list[sockfd]->usedBufLen >= length)
+    {
+      memcpy(buf, tcb_list[sockfd]->recvBuf, length);
+      tcb_list[sockfd]->usedBufLen -= length;
+      memmove(tcb_list[sockfd]->recvBuf, tcb_list[sockfd]->recvBuf + length, tcb_list[sockfd]->usedBufLen);
+      pthread_mutex_unlock(tcb_list[sockfd]->bufMutex);
+      return 1;
+    }
+    pthread_mutex_unlock(tcb_list[sockfd]->bufMutex);
+    rtv = tv;
+    select(0, NULL, NULL, NULL, &rtv);
+  }
+  return -1;
 }
 
 /// @brief 关闭STCP服务器套接字
@@ -154,12 +172,14 @@ void* seghandler(void* arg)
       {
         printf("Server recv SYN\n");
         tcb_list[sockfd]->client_portNum = seg.header.src_port;
-        tcb_list[sockfd]->expect_seqNum = seg.header.seq_num + 1;
+        tcb_list[sockfd]->expect_seqNum = seg.header.seq_num;
         tcb_list[sockfd]->state = CONNECTED;
         pthread_cond_signal(&st_cond);
         seg.header.src_port = tcb_list[sockfd]->server_portNum;
         seg.header.dest_port = tcb_list[sockfd]->client_portNum;
         seg.header.type = SYNACK;
+        seg.header.seq_num = tcb_list[sockfd]->expect_seqNum;
+        seg.header.checksum = checksum(&seg);
         sip_sendseg(sip_conn, &seg);
         printf("Server send SYNACK\n");
       }
@@ -172,15 +192,54 @@ void* seghandler(void* arg)
         seg.header.src_port = tcb_list[sockfd]->server_portNum;
         seg.header.dest_port = tcb_list[sockfd]->client_portNum;
         seg.header.type = FINACK;
+        seg.header.seq_num = tcb_list[sockfd]->expect_seqNum;
+        seg.header.checksum = checksum(&seg);
         sip_sendseg(sip_conn, &seg);
         printf("Server send FINACK\n");
       }
       else if (seg.header.type == SYN)
       {
+        printf("Server recv SYN when CONNECTED\n");
+        tcb_list[sockfd]->expect_seqNum = seg.header.seq_num;
+
         seg.header.src_port = tcb_list[sockfd]->server_portNum;
         seg.header.dest_port = tcb_list[sockfd]->client_portNum;
         seg.header.type = SYNACK;
+        seg.header.seq_num = tcb_list[sockfd]->expect_seqNum;
+        seg.header.checksum = checksum(&seg);
         sip_sendseg(sip_conn, &seg);
+        printf("Server send SYNACK\n");
+      }
+      else if(seg.header.type == DATA)
+      {
+        //接收到数据段
+        if (seg.header.seq_num == tcb_list[sockfd]->expect_seqNum)
+        {
+          printf("Server recv DATA\n");
+          pthread_mutex_lock(tcb_list[sockfd]->bufMutex);
+          //接收到的数据长度超过缓冲区大小
+          if(tcb_list[sockfd]->usedBufLen + seg.header.length > RECEIVE_BUF_SIZE)
+          {
+            printf("Server recv DATA, but recvBuf full\n");
+            pthread_mutex_unlock(tcb_list[sockfd]->bufMutex);
+            break;
+          }
+          memcpy(tcb_list[sockfd]->recvBuf + tcb_list[sockfd]->usedBufLen, seg.data, seg.header.length);
+          pthread_mutex_unlock(tcb_list[sockfd]->bufMutex);
+          tcb_list[sockfd]->usedBufLen += seg.header.length;
+          tcb_list[sockfd]->expect_seqNum += seg.header.length;
+        }
+        else
+        {
+          printf("Server recv DATA, but seq_num wrong\n");
+        }
+        seg.header.src_port = tcb_list[sockfd]->server_portNum;
+        seg.header.dest_port = tcb_list[sockfd]->client_portNum;
+        seg.header.seq_num = tcb_list[sockfd]->expect_seqNum;
+        seg.header.type = DATAACK;
+        seg.header.checksum = checksum(&seg);
+        sip_sendseg(sip_conn, &seg);
+        printf("Server send DATAACK\n");
       }
       break;
     case CLOSEWAIT:
@@ -190,6 +249,8 @@ void* seghandler(void* arg)
         seg.header.src_port = tcb_list[sockfd]->server_portNum;
         seg.header.dest_port = tcb_list[sockfd]->client_portNum;
         seg.header.type = FINACK;
+        seg.header.seq_num = tcb_list[sockfd]->expect_seqNum;
+        seg.header.checksum = checksum(&seg);
         sip_sendseg(sip_conn, &seg);
         printf("Server send FINACK\n");
       }
@@ -218,6 +279,7 @@ void *timer_thread(void *arg)
         if (tcb_list[i] != NULL && tcb_list[i]->state == CLOSEWAIT)
         {
           tcb_list[i]->state = CLOSED;
+          tcb_list[i]->usedBufLen = 0;
           printf("Server sockfd %d closewait timeout\n", i);
         }
       }

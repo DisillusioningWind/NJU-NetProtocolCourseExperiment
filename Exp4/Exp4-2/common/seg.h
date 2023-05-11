@@ -1,5 +1,4 @@
 // 文件名: seg.h
-
 // 描述: 这个文件包含STCP段定义, 以及用于发送和接收STCP段的接口sip_sendseg() and sip_rcvseg(), 及其支持函数的原型. 
 
 #ifndef SEG_H
@@ -46,18 +45,15 @@ typedef struct segment {
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //
 
-int sip_sendseg(int connection, seg_t* segPtr);
 
 // 通过重叠网络(在本实验中，是一个TCP连接)发送STCP段. 因为TCP以字节流形式发送数据, 
 // 为了通过重叠网络TCP连接发送STCP段, 你需要在传输STCP段时，在它的开头和结尾加上分隔符. 
 // 即首先发送表明一个段开始的特殊字符"!&"; 然后发送seg_t; 最后发送表明一个段结束的特殊字符"!#".  
 // 成功时返回1, 失败时返回-1. sip_sendseg()首先使用send()发送两个字符, 然后使用send()发送seg_t,
 // 最后使用send()发送表明段结束的两个字符.
-//
-//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-//
 
-int sip_recvseg(int connection, seg_t* segPtr);
+
+int sip_sendseg(int connection, seg_t* segPtr);
 
 // 通过重叠网络(在本实验中，是一个TCP连接)接收STCP段. 我们建议你使用recv()一次接收一个字节.
 // 你需要查找"!&", 然后是seg_t, 最后是"!#". 这实际上需要你实现一个搜索的FSM, 可以考虑使用如下所示的FSM.
@@ -77,7 +73,12 @@ int sip_recvseg(int connection, seg_t* segPtr);
 // 一个段有PKT_LOST_RATE/2的可能性丢失, 或PKT_LOST_RATE/2的可能性有着错误的校验和.
 // 如果数据包丢失了, 就返回1, 否则返回0. 
 // 即使段没有丢失, 它也有PKT_LOST_RATE/2的可能性有着错误的校验和.
-// 我们在段中反转一个随机比特来创建错误的校验和.
+// 我们在段中反转一个随机比特来创建错误的校验和
+
+
+int sip_recvseg(int connection, seg_t* segPtr);
+
+
 int seglost(seg_t* segPtr); 
 // seglost的源代码
 // 将它拷贝到seg.c中

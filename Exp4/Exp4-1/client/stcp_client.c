@@ -71,7 +71,7 @@ int stcp_client_sock(unsigned int client_port) {
       return i;
     }
   }
-  return 0;
+  return -1;
 }
 
 // 连接STCP服务器
