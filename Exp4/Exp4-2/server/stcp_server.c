@@ -128,9 +128,9 @@ int stcp_server_close(int sockfd)
 /// @brief 处理接收到的STCP段
 void* seghandler(void* arg)
 {
-  struct timeval rtv, tv;
-  tv.tv_sec = CLOSEWAIT_TIMEOUT;
-  tv.tv_usec = 0;
+  // struct timeval rtv, tv;
+  // tv.tv_sec = CLOSEWAIT_TIMEOUT;
+  // tv.tv_usec = 0;
   while (1)
   {
     seg_t seg;
