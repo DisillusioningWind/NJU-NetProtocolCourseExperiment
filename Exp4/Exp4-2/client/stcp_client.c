@@ -126,36 +126,47 @@ int stcp_client_send(int sockfd, void* data, unsigned int length)
     return -1;
   }
   printf("Client send data in\n");
-  printf("lengt: %d\n", length);
+  printf("Client send length: %d\n", length);
   
-  pthread_mutex_lock(tcb_list[sockfd]->bufMutex);
-  segBuf_t *segBuf = (segBuf_t *)malloc(sizeof(segBuf_t));
-  segBuf->seg.header.src_port = tcb_list[sockfd]->client_portNum;
-  segBuf->seg.header.dest_port = tcb_list[sockfd]->server_portNum;
-  segBuf->seg.header.type = DATA;
-  segBuf->seg.header.length = length;
-  segBuf->seg.header.seq_num = tcb_list[sockfd]->next_seqNum;
-  memcpy(segBuf->seg.data, data, length);
-  segBuf->seg.header.checksum = checksum(&segBuf->seg);
-  segBuf->sentTime = get_time_now();
-  segBuf->next = NULL;
-  if (tcb_list[sockfd]->sendBufHead == NULL)
+  //将数据分段
+  int segCnt = length / MAX_SEG_LEN + (length % MAX_SEG_LEN != 0 ? 1 : 0);
+  int remainLen = length;
+  for (int i = 0; i < segCnt; i++)
   {
-    tcb_list[sockfd]->sendBufHead = segBuf;
-    tcb_list[sockfd]->sendBufunSent = segBuf;
-    tcb_list[sockfd]->sendBufTail = segBuf;
-    pthread_t thread;
-    pthread_create(&thread, NULL, sendBuf_timer, (void *)sockfd);
-  }
-  else
-  {
-    tcb_list[sockfd]->sendBufTail->next = segBuf;
-    tcb_list[sockfd]->sendBufTail = segBuf;
-    if(tcb_list[sockfd]->sendBufunSent == NULL)
+    int segLen = remainLen > MAX_SEG_LEN ? MAX_SEG_LEN : remainLen;
+    remainLen -= segLen;
+    segBuf_t *segBuf = (segBuf_t *)malloc(sizeof(segBuf_t));
+    segBuf->seg.header.src_port = tcb_list[sockfd]->client_portNum;
+    segBuf->seg.header.dest_port = tcb_list[sockfd]->server_portNum;
+    segBuf->seg.header.type = DATA;
+    segBuf->seg.header.length = segLen;
+    segBuf->seg.header.seq_num = tcb_list[sockfd]->next_seqNum;
+    memcpy(segBuf->seg.data, data + i * MAX_SEG_LEN, segLen);
+    segBuf->seg.header.checksum = checksum(&segBuf->seg);
+    segBuf->sentTime = get_time_now();
+    segBuf->next = NULL;
+    pthread_mutex_lock(tcb_list[sockfd]->bufMutex);
+    if (tcb_list[sockfd]->sendBufHead == NULL)
+    {
+      //缓冲区为空
+      tcb_list[sockfd]->sendBufHead = segBuf;
       tcb_list[sockfd]->sendBufunSent = segBuf;
+      tcb_list[sockfd]->sendBufTail = segBuf;
+      //启动sendBuf_timer线程
+      pthread_t thread;
+      pthread_create(&thread, NULL, sendBuf_timer, (void *)sockfd);
+    }
+    else
+    {
+      tcb_list[sockfd]->sendBufTail->next = segBuf;
+      tcb_list[sockfd]->sendBufTail = segBuf;
+      //缓冲区中STCP段已全部发送
+      if(tcb_list[sockfd]->sendBufunSent == NULL)
+        tcb_list[sockfd]->sendBufunSent = segBuf;
+    }
+    pthread_mutex_unlock(tcb_list[sockfd]->bufMutex);
+    tcb_list[sockfd]->next_seqNum += segLen;
   }
-  pthread_mutex_unlock(tcb_list[sockfd]->bufMutex);
-  tcb_list[sockfd]->next_seqNum += length;
   //从发送缓冲区中第一个未发送段开始发送，直到已发送但未被确认数据段的数目到达GBN_WINDOW
   printf("unAck_segNum: %d\n", tcb_list[sockfd]->unAck_segNum);
   while(tcb_list[sockfd]->unAck_segNum < GBN_WINDOW)
@@ -163,9 +174,11 @@ int stcp_client_send(int sockfd, void* data, unsigned int length)
     pthread_mutex_lock(tcb_list[sockfd]->bufMutex);
     if (tcb_list[sockfd]->sendBufunSent == NULL)
     {
+      //缓冲区中STCP段已全部发送
       pthread_mutex_unlock(tcb_list[sockfd]->bufMutex);
       break;
     }
+    tcb_list[sockfd]->sendBufunSent->sentTime = get_time_now();
     seg_t seg = tcb_list[sockfd]->sendBufunSent->seg;
     pthread_mutex_unlock(tcb_list[sockfd]->bufMutex);
     printf("seq_num: %d\n", seg.header.seq_num);
@@ -373,8 +386,15 @@ void *seghandler(void* arg)
 void* sendBuf_timer(void* clienttcb)
 {
   int sockfd = (int)clienttcb;
+  struct timeval tv,rtv;
+  tv.tv_sec = 0;
+  tv.tv_usec = SENDBUF_POLLING_INTERVAL / 1000;// 1us = 1000ns
+
   while (1)
   {
+    rtv = tv;
+    select(0, NULL, NULL, NULL, &rtv);
+    //每隔SENDBUF_POLLING_INTERVAL时间就查询第一个已发送但未被确认段
     pthread_mutex_lock(tcb_list[sockfd]->bufMutex);
     segBuf_t *segBuf = tcb_list[sockfd]->sendBufHead;
     if (segBuf == NULL)
@@ -385,6 +405,7 @@ void* sendBuf_timer(void* clienttcb)
     //缓冲区非空
     pthread_mutex_unlock(tcb_list[sockfd]->bufMutex);
     unsigned int now = get_time_now();
+    //如果第一个已发送但未被确认段的发送时间超过DATA_TIMEOUT时间，则重传所有已发送但未被确认段
     if (now - segBuf->sentTime > DATA_TIMEOUT / 1000000000)
     {
       pthread_mutex_lock(tcb_list[sockfd]->bufMutex);
