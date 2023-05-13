@@ -8,7 +8,25 @@
 //返回创建的邻居表.
 nbr_entry_t* nt_create()
 {
-  return 0;
+  int nbrNum = 0;
+  int* nbrID;
+  in_addr_t* nbrIP;
+  topology_getNbrArray(nbrID, nbrIP, &nbrNum);
+
+  nbr_entry_t* nt = (nbr_entry_t*)malloc(sizeof(nbr_entry_t) * nbrNum);
+  for (int i = 0; i < nbrNum; i++)
+  {
+    nt[i].nodeID = nbrID[i];
+    nt[i].nodeIP = nbrIP[i];
+    nt[i].conn = -1;
+    struct in_addr addr;
+    addr.s_addr = nbrIP[i];
+    printf("nodeID:%d\tnodeIP:%s\n", nt[i].nodeID, inet_ntoa(addr));
+  }
+  free(nbrID);
+  free(nbrIP);
+  exit(0);
+  return nt;
 }
 
 //这个函数删除一个邻居表. 它关闭所有连接, 释放所有动态分配的内存.

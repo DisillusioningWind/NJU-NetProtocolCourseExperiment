@@ -4,7 +4,7 @@
 
 #ifndef NEIGHBORTABLE_H 
 #define NEIGHBORTABLE_H
-#include <arpa/inet.h>
+#include "../topology/topology.h"
 
 //邻居表条目定义
 //一张邻居表包含n个条目, 其中n是邻居的数量
