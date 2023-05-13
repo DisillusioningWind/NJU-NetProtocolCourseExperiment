@@ -10,6 +10,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include "../common/constants.h"
 
 #define MAX_NAME_LEN 20
 #define MAX_LINE_LEN 100

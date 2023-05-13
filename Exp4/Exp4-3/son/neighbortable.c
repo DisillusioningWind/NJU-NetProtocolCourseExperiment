@@ -9,10 +9,10 @@
 nbr_entry_t* nt_create()
 {
   int nbrNum = 0;
-  int* nbrID;
-  in_addr_t* nbrIP;
+  int nbrID[MAX_NODE_NUM];
+  in_addr_t nbrIP[MAX_NODE_NUM];
   topology_getNbrArray(nbrID, nbrIP, &nbrNum);
-
+  printf("nbrNum:%d\n", nbrNum);
   nbr_entry_t* nt = (nbr_entry_t*)malloc(sizeof(nbr_entry_t) * nbrNum);
   for (int i = 0; i < nbrNum; i++)
   {
@@ -23,8 +23,6 @@ nbr_entry_t* nt_create()
     addr.s_addr = nbrIP[i];
     printf("nodeID:%d\tnodeIP:%s\n", nt[i].nodeID, inet_ntoa(addr));
   }
-  free(nbrID);
-  free(nbrIP);
   exit(0);
   return nt;
 }

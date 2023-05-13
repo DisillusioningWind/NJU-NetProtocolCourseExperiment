@@ -3,7 +3,8 @@
 //描述: 这个文件实现一些用于解析拓扑文件的辅助函数 
 
 #include "topology.h"
-#include "../common/constants.h"
+#include <errno.h>
+#include <error.h>
 
 //这个函数返回指定主机的节点ID.
 //节点ID是节点IP地址最后8位表示的整数.
@@ -15,7 +16,7 @@ int topology_getNodeIDfromname(char* hostname)
   if (host == NULL) return -1;
   uint32_t addr = ntohl(*((uint32_t *)host->h_addr_list[0]));
   int last = (addr & 0xff);
-  printf("getNodeID:%d\n",last);
+  // printf("getNodeID:%d\n",last);
   return last;
 }
 
@@ -32,10 +33,15 @@ int topology_getNodeIDfromip(struct in_addr* addr)
 int topology_getIDIPfromname(char *hostname, in_addr_t *addr, int *id)
 {
   struct hostent *host = gethostbyname(hostname);
-  if (host == NULL) return -1;
+  if (host == NULL)
+  {
+    printf("gethostbyname error: %s\n", strerror(errno));
+    return -1;
+  }
   uint32_t addr_net = ntohl(*((uint32_t *)host->h_addr_list[0]));
   *addr = addr_net;
   *id = addr_net & 0xff;
+  printf("nodeID:%d\tnodeIP:%x\n", *id, *addr);
   return 0;
 }
 
@@ -144,7 +150,7 @@ int* topology_getNodeArray()
 //返回一个动态分配的数组, 它包含所有邻居的节点ID.  
 int topology_getNbrArray(int* ids, in_addr_t* ips, int* num)
 {
-  char filename[] = "topology.dat";
+  char filename[] = "./topology/topology.dat";
   char line[MAX_LINE_LEN];
   char nodes[MAX_NODE_NUM][MAX_NAME_LEN];
   char node1[MAX_NAME_LEN], node2[MAX_NAME_LEN];
@@ -153,12 +159,14 @@ int topology_getNbrArray(int* ids, in_addr_t* ips, int* num)
   char hostname[MAX_NAME_LEN];
   gethostname(hostname, sizeof(hostname));
 
-  FILE *fp = fopen("topology.dat", "r");
+  FILE *fp = fopen(filename, "r");
   if (fp == NULL) return -1;
+  printf("hostname: %s\n", hostname);
   while (fgets(line, sizeof(line), fp) != NULL)
   {
     if (sscanf(line, "%s %s %d", node1, node2, &cost) == 3)
     {
+      // printf("%s %s %d\n", node1, node2, cost);
       if (strcmp(node1, hostname) == 0)
       {
         strcpy(nodes[num_nodes], node2);
@@ -173,8 +181,6 @@ int topology_getNbrArray(int* ids, in_addr_t* ips, int* num)
   }
   fclose(fp);
 
-  ids = (int *)malloc(sizeof(int) * num_nodes);
-  ips = (in_addr_t *)malloc(sizeof(in_addr_t) * num_nodes);
   *num = num_nodes;
   for (int i = 0; i < num_nodes; i++)
   {
