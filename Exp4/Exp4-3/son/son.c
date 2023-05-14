@@ -42,7 +42,7 @@ int sip_conn;
 //这个线程打开TCP端口CONNECTION_PORT, 等待节点ID比自己大的所有邻居的进入连接,
 //在所有进入连接都建立后, 这个线程终止. 
 void* waitNbrs(void* arg) {
-  int sockfd, connfd, res;
+  int sockfd, connfd, res, nbrNum = 0, myNodeID;
   struct sockaddr_in my_addr;
   struct sockaddr_in their_addr;
   //创建TCP套接字
@@ -55,7 +55,6 @@ void* waitNbrs(void* arg) {
   my_addr.sin_family = AF_INET;
   my_addr.sin_port = htons(CONNECTION_PORT);
   my_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-
   //绑定TCP套接字到本地地址结构
   res = bind(sockfd, (struct sockaddr*)&my_addr, sizeof(struct sockaddr));
   if (res == -1) {
@@ -68,7 +67,17 @@ void* waitNbrs(void* arg) {
 	perror("listen");
 	exit(1);
   }
+  //获得ID比自己大的邻居的数量
+  nbr_entry_t* nbr = nt;
+  myNodeID = topology_getMyNodeID();
+  while (nbr != NULL) {
+    if (nbr->nodeID > myNodeID) {
+      nbrNum++;
+    }
+    nbr++;
+  }
   //接受来自邻居的连接
+  int conNum = 0;
   while (1) {
 	  connfd = accept(sockfd, (struct sockaddr*)&their_addr, NULL);
 	  if (connfd == -1) {
@@ -76,9 +85,16 @@ void* waitNbrs(void* arg) {
 	    continue;
 	  }
 	  int nodeID = topology_getNodeIDfromip(their_addr.sin_addr.s_addr);
-	  if (nodeID > topology_getMyNodeID()) {
-	    nt_addconn(nt, nodeID, connfd);
-	  }
+    if (nodeID > myNodeID)
+    {
+      nt_addconn(nt, nodeID, connfd);
+      conNum++;
+    }
+    //所有ID更大的邻居都已连接
+    if(conNum >= nbrNum)
+    {
+      break;
+    }
   }
   return NULL;
 }
@@ -86,24 +102,166 @@ void* waitNbrs(void* arg) {
 // 这个函数连接到节点ID比自己小的所有邻居.
 // 在所有外出连接都建立后, 返回1, 否则返回-1.
 int connectNbrs() {
-  return 0;
+  int sockfd, res, myNodeID, nbrNum = 0;
+  struct sockaddr_in their_addr;
+  //创建TCP套接字
+  sockfd = socket(AF_INET, SOCK_STREAM, 0);
+  if (sockfd < 0) {
+  perror("socket");
+  exit(1);
+  }
+  //获得ID比自己小的邻居的数量
+  nbr_entry_t* nbr = nt;
+  myNodeID = topology_getMyNodeID();
+  while (nbr != NULL) {
+    if (nbr->nodeID < myNodeID) {
+      nbrNum++;
+    }
+    nbr++;
+  }
+  //连接到ID比自己小的邻居
+  int conNum = 0;
+  while (1) {
+    nbr = nt;
+    while (nbr != NULL) {
+      if (nbr->nodeID < myNodeID) {
+        //设置邻居地址结构
+        their_addr.sin_family = AF_INET;
+        their_addr.sin_port = htons(CONNECTION_PORT);
+        their_addr.sin_addr.s_addr = nbr->nodeIP;
+        //连接到邻居
+        res = connect(sockfd, (struct sockaddr*)&their_addr, sizeof(struct sockaddr));
+        if (res == -1) {
+          perror("connect");
+          continue;
+        }
+        nt_addconn(nt, nbr->nodeID, sockfd);
+        conNum++;
+      }
+      nbr++;
+    }
+    //所有ID更小的邻居都已连接
+    if(conNum >= nbrNum)
+    {
+      break;
+    }
+  }
+  return 1;
 }
 
 //每个listen_to_neighbor线程持续接收来自一个邻居的报文. 它将接收到的报文转发给SIP进程.
 //所有的listen_to_neighbor线程都是在到邻居的TCP连接全部建立之后启动的. 
 void* listen_to_neighbor(void* arg) {
-  return 0;
+  int idx = *(int*)arg;
+  int nodeID = nt[idx].nodeID;
+  int connfd = nt[idx].conn;
+  while (1) {
+    sip_pkt_t pkt;
+    int res = recvpkt(&pkt, connfd);
+    if (res == -1) {
+      perror("recv");
+      continue;
+    }
+    //将报文转发给SIP进程
+    res = forwardpktToSIP(&pkt, sip_conn);
+    if (res == -1) {
+      perror("send");
+      continue;
+    }
+  }
+  return NULL;
 }
 
 //这个函数打开TCP端口SON_PORT, 等待来自本地SIP进程的进入连接. 
 //在本地SIP进程连接之后, 这个函数持续接收来自SIP进程的sendpkt_arg_t结构, 并将报文发送到重叠网络中的下一跳. 
 //如果下一跳的节点ID为BROADCAST_NODEID, 报文应发送到所有邻居节点.
 void waitSIP() {
+  start:
+  int sockfd, res;
+  struct sockaddr_in my_addr;
+  //创建TCP套接字
+  sockfd = socket(AF_INET, SOCK_STREAM, 0);
+  if (sockfd < 0) {
+    perror("socket");
+    exit(1);
+  }
+  //设置本地地址结构
+  my_addr.sin_family = AF_INET;
+  my_addr.sin_port = htons(SON_PORT);
+  my_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+  //绑定TCP套接字到本地地址结构
+  res = bind(sockfd, (struct sockaddr*)&my_addr, sizeof(struct sockaddr));
+  if (res == -1) {
+    perror("bind");
+    exit(1);
+  }
+  //监听TCP套接字
+  res = listen(sockfd, MAX_NODE_NUM);
+  if (res == -1) {
+    perror("listen");
+    exit(1);
+  }
+  //接受来自SIP进程的连接
+  sip_conn = accept(sockfd, NULL, NULL);
+  if (sip_conn == -1) {
+    perror("accept");
+    exit(1);
+  }
+  //持续接收来自SIP进程的报文
+  while (1) {
+    sendpkt_arg_t arg;
+    int nextNodeID;
+    res = getpktToSend(&arg, &nextNodeID, sip_conn);
+    if (res == -1) {
+      //如果SIP进程关闭了连接, 重新等待SIP进程的连接
+      close(sip_conn);
+      goto start;
+    }
+    //如果下一跳的节点ID为BROADCAST_NODEID, 报文应发送到所有邻居节点
+    if (nextNodeID == BROADCAST_NODEID) {
+      nbr_entry_t* nbr = nt;
+      while (nbr != NULL) {
+        res = sendpkt(&arg.pkt, nbr->conn);
+        if (res == -1) {
+          perror("send");
+          continue;
+        }
+        nbr++;
+      }
+    }
+    else {
+      //将报文发送到重叠网络中的下一跳
+      nbr_entry_t *nbr = nt;
+      while (nbr != NULL) {
+        if (nbr->nodeID == nextNodeID) {
+          res = sendpkt(&arg.pkt, nbr->conn);
+          if (res == -1) {
+            perror("send");
+            continue;
+          }
+          break;
+        }
+        nbr++;
+      }
+    }
+  }
+  return NULL;
 }
 
 //这个函数停止重叠网络, 当接收到信号SIGINT时, 该函数被调用.
 //它关闭所有的连接, 释放所有动态分配的内存.
 void son_stop() {
+  //关闭所有连接
+  nbr_entry_t* nbr = nt;
+  while (nbr != NULL) {
+    close(nbr->conn);
+    nbr++;
+  }
+  //释放所有动态分配的内存
+  nt_destroy(nt);
+  //关闭与SIP进程的连接
+  close(sip_conn);
+  exit(0);
 }
 
 int main() {
