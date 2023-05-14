@@ -31,7 +31,8 @@
 /**************************************************************/
 
 //将邻居表声明为一个全局变量 
-nbr_entry_t* nt; 
+nbr_entry_t* nt;
+int nbrSumNum = 0;
 //将与SIP进程之间的TCP连接声明为一个全局变量
 int sip_conn; 
 
@@ -68,13 +69,12 @@ void* waitNbrs(void* arg) {
 	exit(1);
   }
   //获得ID比自己大的邻居的数量
-  nbr_entry_t* nbr = nt;
   myNodeID = topology_getMyNodeID();
-  while (nbr != NULL) {
-    if (nbr->nodeID > myNodeID) {
+  for(int i = 0; i < nbrSumNum; i++)
+  {
+    if (nt[i].nodeID > myNodeID) {
       nbrNum++;
     }
-    nbr++;
   }
   //接受来自邻居的连接
   int conNum = 0;
@@ -111,34 +111,32 @@ int connectNbrs() {
   exit(1);
   }
   //获得ID比自己小的邻居的数量
-  nbr_entry_t* nbr = nt;
   myNodeID = topology_getMyNodeID();
-  while (nbr != NULL) {
-    if (nbr->nodeID < myNodeID) {
+  for(int i = 0; i < nbrSumNum; i++)
+  {
+    if (nt[i].nodeID < myNodeID) {
       nbrNum++;
     }
-    nbr++;
   }
   //连接到ID比自己小的邻居
   int conNum = 0;
   while (1) {
-    nbr = nt;
-    while (nbr != NULL) {
-      if (nbr->nodeID < myNodeID) {
-        //设置邻居地址结构
+    for(int i = 0; i < nbrSumNum; i++)
+    {
+      if (nt[i].nodeID < myNodeID) {
+        //设置对方地址结构
         their_addr.sin_family = AF_INET;
         their_addr.sin_port = htons(CONNECTION_PORT);
-        their_addr.sin_addr.s_addr = nbr->nodeIP;
-        //连接到邻居
+        their_addr.sin_addr.s_addr = nt[i].nodeIP;
+        //连接到对方
         res = connect(sockfd, (struct sockaddr*)&their_addr, sizeof(struct sockaddr));
         if (res == -1) {
           perror("connect");
           continue;
         }
-        nt_addconn(nt, nbr->nodeID, sockfd);
+        nt_addconn(nt, nt[i].nodeID, sockfd);
         conNum++;
       }
-      nbr++;
     }
     //所有ID更小的邻居都已连接
     if(conNum >= nbrNum)
@@ -218,29 +216,25 @@ void waitSIP() {
     }
     //如果下一跳的节点ID为BROADCAST_NODEID, 报文应发送到所有邻居节点
     if (nextNodeID == BROADCAST_NODEID) {
-      nbr_entry_t* nbr = nt;
-      while (nbr != NULL) {
-        res = sendpkt(&arg, nbr->conn);
+      for (int i = 0; i < nbrSumNum; i++) {
+        res = sendpkt(&arg, nt[i].conn);
         if (res == -1) {
           perror("send");
           continue;
         }
-        nbr++;
       }
     }
     else {
       //将报文发送到重叠网络中的下一跳
-      nbr_entry_t *nbr = nt;
-      while (nbr != NULL) {
-        if (nbr->nodeID == nextNodeID) {
-          res = sendpkt(&arg, nbr->conn);
+      for (int i = 0; i < nbrSumNum; i++) {
+        if (nt[i].nodeID == nextNodeID) {
+          res = sendpkt(&arg, nt[i].conn);
           if (res == -1) {
             perror("send");
             continue;
           }
-          break;
         }
-        nbr++;
+        break;
       }
     }
   }
@@ -251,10 +245,8 @@ void waitSIP() {
 //它关闭所有的连接, 释放所有动态分配的内存.
 void son_stop() {
   //关闭所有连接
-  nbr_entry_t* nbr = nt;
-  while (nbr != NULL) {
-    close(nbr->conn);
-    nbr++;
+  for (int i = 0; i < nbrSumNum; i++) {
+    close(nt[i].conn);
   }
   //释放所有动态分配的内存
   nt_destroy(nt);
@@ -269,6 +261,7 @@ int main() {
 
   //创建一个邻居表
   nt = nt_create();
+  nbrSumNum = topology_getNbrNum();
   //将sip_conn初始化为-1, 即还未与SIP进程连接
   sip_conn = -1;
 	
@@ -276,9 +269,7 @@ int main() {
   signal(SIGINT, son_stop);
 
   //打印所有邻居
-  int nbrNum = topology_getNbrNum();
-  int i;
-  for(i=0;i<nbrNum;i++) {
+  for(int i=0;i<nbrSumNum;i++) {
   	printf("Overlay network: neighbor %d:%d\n",i+1,nt[i].nodeID);
   }
   //启动waitNbrs线程, 等待节点ID比自己大的所有邻居的进入连接
@@ -289,6 +280,7 @@ int main() {
   sleep(SON_START_DELAY);
 	
   //连接到节点ID比自己小的所有邻居
+  printf("Overlay network: all neighbors connected...\n");
   connectNbrs();
 
   //等待waitNbrs线程返回
@@ -297,7 +289,7 @@ int main() {
   //此时, 所有与邻居之间的连接都建立好了
 	
   //创建线程监听所有邻居
-  for(i=0;i<nbrNum;i++) {
+  for(int i=0;i<nbrSumNum;i++) {
   	int* idx = (int*)malloc(sizeof(int));
   	*idx = i;
   	pthread_t nbr_listen_thread;
