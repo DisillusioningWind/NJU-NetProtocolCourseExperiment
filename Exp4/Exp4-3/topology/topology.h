@@ -23,7 +23,7 @@ int topology_getNodeIDfromname(char* hostname);
 
 //这个函数返回指定的IP地址的节点ID.
 //如果不能获取节点ID, 返回-1.
-int topology_getNodeIDfromip(struct in_addr* addr);
+int topology_getNodeIDfromip(struct in_addr addr);
 
 int topology_getIDIPfromname(char *hostname, in_addr_t *addr, int *id);
 

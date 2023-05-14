@@ -19,8 +19,8 @@ nbr_entry_t* nt_create()
     nt[i].nodeID = nbrID[i];
     nt[i].nodeIP = nbrIP[i];
     nt[i].conn = -1;
-    struct in_addr addr;
-    addr.s_addr = nbrIP[i];
+    // struct in_addr addr;
+    // addr.s_addr = nbrIP[i];
     // printf("nodeID:%d nodeIP:%s\n", nt[i].nodeID, inet_ntoa(addr));
   }
   return nt;
