@@ -281,7 +281,6 @@ int main() {
   for(i=0;i<nbrNum;i++) {
   	printf("Overlay network: neighbor %d:%d\n",i+1,nt[i].nodeID);
   }
-  exit(0);
   //启动waitNbrs线程, 等待节点ID比自己大的所有邻居的进入连接
   pthread_t waitNbrs_thread;
   pthread_create(&waitNbrs_thread,NULL,waitNbrs,(void*)0);
