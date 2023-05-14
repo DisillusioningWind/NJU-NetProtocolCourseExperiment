@@ -151,7 +151,7 @@ int sendpkt(sip_pkt_t* pkt, int conn)
   int res = 1;
   res = send(conn, "!&", 2, 0);
   if (res <= 0) return -1;
-  res = send(conn, &pkt, sizeof(sip_pkt_t), 0);
+  res = send(conn, pkt, sizeof(sip_pkt_t), 0);
   if (res <= 0) return -1;
   res = send(conn, "!#", 2, 0);
   return res > 0 ? 1 : -1;
@@ -164,7 +164,7 @@ int sendpkt(sip_pkt_t* pkt, int conn)
 // PKTSTART1 -- 起点 
 // PKTSTART2 -- 接收到'!', 期待'&' 
 // PKTRECV -- 接收到'&', 开始接收数据
-// PKTSTOP1 -- 接收到'!', 期待'#'以结束数据的接收 
+// PKTSTOP1 -- 接收到'!', 期待'#'以结束数据的接收
 // 如果成功接收报文, 返回1, 否则返回-1.
 int recvpkt(sip_pkt_t* pkt, int conn)
 {
