@@ -14,7 +14,7 @@ int topology_getNodeIDfromname(char* hostname)
 {
   struct hostent* host = gethostbyname(hostname);
   if (host == NULL) return -1;
-  uint32_t addr = ntohl(*((uint32_t *)host->h_addr_list[0]));
+  uint32_t addr = ntohl(*((uint32_t *)host->h_addr_list[1]));
   int last = (addr & 0xff);
   // printf("getNodeID:%d\n",last);
   return last;
@@ -30,6 +30,7 @@ int topology_getNodeIDfromip(struct in_addr* addr)
   return last;
 }
 
+//返回的addr为大端序
 int topology_getIDIPfromname(char *hostname, in_addr_t *addr, int *id)
 {
   struct hostent *host = gethostbyname(hostname);
@@ -39,9 +40,9 @@ int topology_getIDIPfromname(char *hostname, in_addr_t *addr, int *id)
     return -1;
   }
   uint32_t addr_net = ntohl(*((uint32_t *)host->h_addr_list[0]));
-  *addr = addr_net;
+  *addr = *((uint32_t *)host->h_addr_list[0]);
   *id = addr_net & 0xff;
-  printf("nodeID:%d\tnodeIP:%x\n", *id, *addr);
+  // printf("nodeID:%d\tnodeIP:%x\n", *id, *addr);
   return 0;
 }
 
@@ -148,7 +149,7 @@ int* topology_getNodeArray()
 
 //这个函数解析保存在文件topology.dat中的拓扑信息.
 //返回一个动态分配的数组, 它包含所有邻居的节点ID.  
-int topology_getNbrArray(int* ids, in_addr_t* ips, int* num)
+int topology_getNbrArray(int ids[], in_addr_t ips[], int* num)
 {
   char filename[] = "./topology/topology.dat";
   char line[MAX_LINE_LEN];
@@ -184,7 +185,7 @@ int topology_getNbrArray(int* ids, in_addr_t* ips, int* num)
   *num = num_nodes;
   for (int i = 0; i < num_nodes; i++)
   {
-    topology_getIDIPfromname(nodes[i], &ids[i], &ips[i]);
+    topology_getIDIPfromname(nodes[i], &ips[i], &ids[i]);
   }
   return 0;
 }
