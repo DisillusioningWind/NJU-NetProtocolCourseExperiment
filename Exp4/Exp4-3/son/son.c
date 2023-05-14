@@ -43,7 +43,7 @@ int sip_conn;
 //这个线程打开TCP端口CONNECTION_PORT, 等待节点ID比自己大的所有邻居的进入连接,
 //在所有进入连接都建立后, 这个线程终止. 
 void* waitNbrs(void* arg) {
-  int sockfd, connfd, res, nbrNum = 0, myNodeID;
+  int sockfd, connfd, res, nbrNum = 0, myNodeID, addr_len;
   struct sockaddr_in my_addr;
   struct sockaddr_in their_addr;
   //创建TCP套接字
@@ -79,7 +79,7 @@ void* waitNbrs(void* arg) {
   //接受来自邻居的连接
   int conNum = 0;
   while (1) {
-	  connfd = accept(sockfd, (struct sockaddr*)&their_addr, NULL);
+	  connfd = accept(sockfd, (struct sockaddr*)&their_addr, &addr_len);
 	  if (connfd == -1) {
 	    perror("accept");
 	    continue;
@@ -87,6 +87,7 @@ void* waitNbrs(void* arg) {
 	  int nodeID = topology_getNodeIDfromip(their_addr.sin_addr);
     if (nodeID > myNodeID)
     {
+      printf("accept a connection from node %d\n", nodeID);
       nt_addconn(nt, nodeID, connfd);
       conNum++;
     }
@@ -280,13 +281,13 @@ int main() {
   sleep(SON_START_DELAY);
 	
   //连接到节点ID比自己小的所有邻居
-  printf("Overlay network: all neighbors connected...\n");
   connectNbrs();
 
   //等待waitNbrs线程返回
   pthread_join(waitNbrs_thread,NULL);	
 
   //此时, 所有与邻居之间的连接都建立好了
+  printf("Overlay network: all neighbors connected...\n");
 	
   //创建线程监听所有邻居
   for(int i=0;i<nbrSumNum;i++) {
