@@ -19,7 +19,10 @@ int topology_getNodeIDfromname(char* hostname)
   int last;
   for (; *pptr != NULL; pptr++)
   {
-    addr = ntohl(*((uint32_t *)pptr));
+    addr = ntohl(*((uint32_t *)(*pptr)));
+    struct in_addr in;
+    in.s_addr = (*((uint32_t *)(*pptr)));
+    printf("nodeIP:%s\n", inet_ntoa(in));
     last = (addr & 0xff);
     if(last != 1) break;
   }
