@@ -174,8 +174,8 @@ void* listen_to_neighbor(void* arg) {
     sip_pkt_t pkt;
     int res = recvpkt(&pkt, connfd);
     if (res == -1) {
-      printf("recvpkt id:%d\n", pkt.header.src_nodeID);
-      perror("recv");
+      // printf("recvpkt id:%d\n", pkt.header.src_nodeID);
+      // perror("recv");
       return NULL;
     }
     if(sip_conn != -1)

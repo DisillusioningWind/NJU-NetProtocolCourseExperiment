@@ -179,6 +179,7 @@ int sendpkt(sip_pkt_t* pkt, int conn)
 int recvpkt(sip_pkt_t* pkt, int conn)
 {
   int res = 1, len = 0;
+  char buf[1600];
   int state = PKTSTART1;
   char c;
   while(res > 0)
@@ -197,10 +198,11 @@ int recvpkt(sip_pkt_t* pkt, int conn)
     case PKTRECV:
       while(len < sizeof(sip_pkt_t))
       {
-        res = recv(conn, pkt + len, sizeof(sip_pkt_t) - len, 0);
+        res = recv(conn, (char*)(buf + len), sizeof(sip_pkt_t) - len, 0);
         if(res <= 0) return -1;
         len += res;
       }
+      memcpy(pkt, buf, sizeof(sip_pkt_t));
       state = PKTSTOP1;
       break;
     case PKTSTOP1:
