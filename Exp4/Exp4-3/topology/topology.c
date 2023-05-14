@@ -39,7 +39,7 @@ int topology_getNodeIDfromip(struct in_addr addr)
 {
   uint32_t addr_net = ntohl(addr.s_addr);
   int last = addr_net & 0xff;
-  printf("getNodeID:%d\n", last);
+  // printf("getNodeID:%d\n", last);
   return last;
 }
 

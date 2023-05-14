@@ -12,7 +12,7 @@ nbr_entry_t* nt_create()
   int nbrID[MAX_NODE_NUM];
   in_addr_t nbrIP[MAX_NODE_NUM];
   topology_getNbrArray(nbrID, nbrIP, &nbrNum);
-  printf("nbrNum:%d\n", nbrNum);
+  // printf("nbrNum:%d\n", nbrNum);
   nbr_entry_t* nt = (nbr_entry_t*)malloc(sizeof(nbr_entry_t) * nbrNum);
   for (int i = 0; i < nbrNum; i++)
   {

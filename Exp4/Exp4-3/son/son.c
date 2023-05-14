@@ -97,7 +97,7 @@ void* waitNbrs(void* arg) {
 	    continue;
 	  }
 	  int nodeID = topology_getNodeIDfromip(their_addr.sin_addr);
-    printf("accept con from ip:%s\n", inet_ntoa(their_addr.sin_addr));
+    printf("accept conn from ip:%s\n", inet_ntoa(their_addr.sin_addr));
     if (nodeID > myNodeID)
     {
       nt_addconn(nt, nodeID, connfd);
@@ -154,7 +154,7 @@ int connectNbrs() {
         exit(0);
       }
       nt_addconn(nt, nt[i].nodeID, sockfd);
-      printf("connect to node %d, fd:%d\n", nt[i].nodeID, nt[i].conn);
+      printf("connect to node %d\n", nt[i].nodeID);
     }
   }
   return 1;
@@ -165,6 +165,11 @@ int connectNbrs() {
 void* listen_to_neighbor(void* arg) {
   int idx = *(int*)arg;
   int connfd = nt[idx].conn;
+  if(connfd == -1)
+  {
+    printf("connfd == -1\n");
+    return NULL;
+  }
   while (1) {
     sip_pkt_t pkt;
     int res = recvpkt(&pkt, connfd);
@@ -172,11 +177,14 @@ void* listen_to_neighbor(void* arg) {
       perror("recv");
       continue;
     }
-    //将报文转发给SIP进程
-    res = forwardpktToSIP(&pkt, sip_conn);
-    if (res == -1) {
-      perror("send");
-      continue;
+    if(sip_conn != -1)
+    {
+      //将报文转发给SIP进程
+      res = forwardpktToSIP(&pkt, sip_conn);
+      if (res == -1) {
+        perror("send");
+        continue;
+      }
     }
   }
   return NULL;
@@ -303,7 +311,6 @@ int main() {
 
   //此时, 所有与邻居之间的连接都建立好了
   printf("Overlay network: all neighbors connected...\n");
-  exit(0);
 	
   //创建线程监听所有邻居
   for(int i=0;i<nbrSumNum;i++) {
