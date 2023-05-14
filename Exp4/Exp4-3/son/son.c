@@ -134,7 +134,7 @@ int connectNbrs() {
   while (1) {
     for(int i = 0; i < nbrSumNum; i++)
     {
-      if (nt[i].nodeID < myNodeID) {
+      if (nt[i].nodeID < myNodeID && nt[i].conn == -1) {
         //设置对方地址结构
         their_addr.sin_family = AF_INET;
         their_addr.sin_port = htons(CONNECTION_PORT);
