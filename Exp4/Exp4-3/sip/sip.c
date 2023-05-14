@@ -41,6 +41,9 @@ int connectToSON() {
 	perror("socket");
 	exit(1);
   }
+  //设置端口复用
+  int opt = 1;
+  res = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
   //设置服务器地址结构
   servaddr.sin_family = AF_INET;
   servaddr.sin_port = htons(SON_PORT);

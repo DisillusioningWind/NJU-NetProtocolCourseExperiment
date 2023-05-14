@@ -118,6 +118,9 @@ int connectNbrs() {
   perror("socket");
   exit(1);
   }
+  //设置端口复用
+  int opt = 1;
+  res = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
   //获得ID比自己小的邻居的数量
   myNodeID = topology_getMyNodeID();
   for(int i = 0; i < nbrSumNum; i++)
@@ -190,6 +193,9 @@ void waitSIP() {
     perror("socket");
     exit(1);
   }
+  //设置端口复用
+  int opt = 1;
+  res = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
   //设置本地地址结构
   my_addr.sin_family = AF_INET;
   my_addr.sin_port = htons(SON_PORT);
