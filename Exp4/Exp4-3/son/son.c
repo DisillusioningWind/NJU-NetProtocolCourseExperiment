@@ -24,7 +24,7 @@
 #include "neighbortable.h"
 
 //你应该在这个时间段内启动所有重叠网络节点上的SON进程
-#define SON_START_DELAY 30
+#define SON_START_DELAY 25
 
 /**************************************************************/
 //声明全局变量
@@ -174,6 +174,7 @@ void* listen_to_neighbor(void* arg) {
     sip_pkt_t pkt;
     int res = recvpkt(&pkt, connfd);
     if (res == -1) {
+      printf("recvpkt id:%d\n", pkt.header.src_nodeID);
       perror("recv");
       continue;
     }

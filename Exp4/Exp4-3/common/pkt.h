@@ -3,6 +3,8 @@
 
 #include "constants.h"
 #include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 //报文类型定义, 用于报文首部中的type字段
 #define	ROUTE_UPDATE 1

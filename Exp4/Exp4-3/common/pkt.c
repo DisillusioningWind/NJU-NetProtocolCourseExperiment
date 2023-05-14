@@ -177,24 +177,29 @@ int recvpkt(sip_pkt_t* pkt, int conn)
     {
     case PKTSTART1:
       res = recv(conn, &c, 1, 0);
+      printf("recvpkt: %c\n", c);
       if(c == '!') state = PKTSTART2;
       break;
     case PKTSTART2:
       res = recv(conn, &c, 1, 0);
+      printf("recvpkt: %c\n", c);
       if(c == '&') state = PKTRECV;
       else state = PKTSTART1;
       break;
     case PKTRECV:
       res = recv(conn, pkt, sizeof(sip_pkt_t), 0);
+      printf("recvpkt: %d\n", res);
       state = PKTSTOP1;
       break;
     case PKTSTOP1:
       res = recv(conn, &c, 1, 0);
+      printf("recvpkt: %c\n", c);
       if(c == '!') state = PKTSTOP2;
       else return -1;
       break;
     case PKTSTOP2:
       res = recv(conn, &c, 1, 0);
+      printf("recvpkt: %c\n", c);
       if(c == '#') return 1;
       else return -1;
       break;
