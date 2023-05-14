@@ -92,11 +92,16 @@ void* waitNbrs(void* arg) {
 	    continue;
 	  }
 	  int nodeID = topology_getNodeIDfromip(their_addr.sin_addr);
+    printf("accept con from ip:%s\n", inet_ntoa(their_addr.sin_addr));
+    printf("accept conn from node:%d, younode:%d\n", nodeID, myNodeID);
     if (nodeID > myNodeID)
     {
-      printf("accept a connection from node %d\n", nodeID);
       nt_addconn(nt, nodeID, connfd);
       conNum++;
+    }
+    else
+    {
+      close(connfd);
     }
     //所有ID更大的邻居都已连接
     if(conNum >= nbrNum)
@@ -142,6 +147,7 @@ int connectNbrs() {
         //连接到对方
         res = connect(sockfd, (struct sockaddr*)&their_addr, sizeof(struct sockaddr));
         if (res == -1) {
+          printf("connect to node %d failed,mynode:%d\n", nt[i].nodeID, myNodeID);
           perror("connect");
           exit(0);
         }
