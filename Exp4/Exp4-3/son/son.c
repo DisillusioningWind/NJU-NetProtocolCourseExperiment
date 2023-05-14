@@ -43,9 +43,10 @@ int sip_conn;
 //这个线程打开TCP端口CONNECTION_PORT, 等待节点ID比自己大的所有邻居的进入连接,
 //在所有进入连接都建立后, 这个线程终止. 
 void* waitNbrs(void* arg) {
-  int sockfd, connfd, res, nbrNum = 0, myNodeID, addr_len;
+  int sockfd, connfd, res, nbrNum = 0, myNodeID;
   struct sockaddr_in my_addr;
   struct sockaddr_in their_addr;
+  unsigned int sin_size = sizeof(struct sockaddr_in);
   //创建TCP套接字
   sockfd = socket(AF_INET, SOCK_STREAM, 0);
   if (sockfd < 0) {
@@ -83,11 +84,15 @@ void* waitNbrs(void* arg) {
       nbrNum++;
     }
   }
+  if(nbrNum == 0)
+  {
+    return NULL;
+  }
   //接受来自邻居的连接
   int conNum = 0;
   while (1) {
-	  connfd = accept(sockfd, (struct sockaddr*)&their_addr, &addr_len);
-	  if (connfd == -1) {
+    connfd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
+    if (connfd == -1) {
 	    perror("accept");
 	    continue;
 	  }
@@ -147,7 +152,7 @@ int connectNbrs() {
         //连接到对方
         res = connect(sockfd, (struct sockaddr*)&their_addr, sizeof(struct sockaddr));
         if (res == -1) {
-          printf("connect to node %d failed,mynode:%d\n", nt[i].nodeID, myNodeID);
+          printf("connect to node %d failed, ip:%s\n", nt[i].nodeID, inet_ntoa(their_addr.sin_addr));
           perror("connect");
           exit(0);
         }
