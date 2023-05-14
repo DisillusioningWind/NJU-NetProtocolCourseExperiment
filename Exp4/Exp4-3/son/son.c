@@ -98,7 +98,6 @@ void* waitNbrs(void* arg) {
 	  }
 	  int nodeID = topology_getNodeIDfromip(their_addr.sin_addr);
     printf("accept con from ip:%s\n", inet_ntoa(their_addr.sin_addr));
-    printf("accept conn from node:%d, younode:%d\n", nodeID, myNodeID);
     if (nodeID > myNodeID)
     {
       nt_addconn(nt, nodeID, connfd);
@@ -120,51 +119,42 @@ void* waitNbrs(void* arg) {
 // 这个函数连接到节点ID比自己小的所有邻居.
 // 在所有外出连接都建立后, 返回1, 否则返回-1.
 int connectNbrs() {
-  int sockfd, res, myNodeID, nbrNum = 0;
-  struct sockaddr_in their_addr;
-  //创建TCP套接字
-  sockfd = socket(AF_INET, SOCK_STREAM, 0);
-  if (sockfd < 0) {
-  perror("socket");
-  exit(1);
-  }
-  //设置端口复用
-  int opt = 1;
-  res = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-  //获得ID比自己小的邻居的数量
-  myNodeID = topology_getMyNodeID();
+  int nbrNum = 0;
+  int myNodeID = topology_getMyNodeID();
+  // 获得ID比自己小的邻居的数量
   for(int i = 0; i < nbrSumNum; i++)
   {
-    if (nt[i].nodeID < myNodeID) {
+    if (nt[i].nodeID < myNodeID)
       nbrNum++;
-    }
   }
   //连接到ID比自己小的邻居
-  int conNum = 0;
-  while (1) {
-    for(int i = 0; i < nbrSumNum; i++)
-    {
-      if (nt[i].nodeID < myNodeID && nt[i].conn == -1) {
-        //设置对方地址结构
-        their_addr.sin_family = AF_INET;
-        their_addr.sin_port = htons(CONNECTION_PORT);
-        their_addr.sin_addr.s_addr = nt[i].nodeIP;
-        //连接到对方
-        res = connect(sockfd, (struct sockaddr*)&their_addr, sizeof(struct sockaddr));
-        if (res == -1) {
-          printf("connect to node %d failed, ip:%s\n", nt[i].nodeID, inet_ntoa(their_addr.sin_addr));
-          perror("connect");
-          exit(0);
-        }
-        nt_addconn(nt, nt[i].nodeID, sockfd);
-        printf("connect to node %d, fd:%d\n", nt[i].nodeID, nt[i].conn);
-        conNum++;
+  for(int i = 0; i < nbrSumNum; i++)
+  {
+    if (nt[i].nodeID < myNodeID && nt[i].conn == -1) {
+      int sockfd, res;
+      //创建TCP套接字
+      sockfd = socket(AF_INET, SOCK_STREAM, 0);
+      if (sockfd < 0) {
+        perror("socket");
+        exit(1);
       }
-    }
-    //所有ID更小的邻居都已连接
-    if(conNum >= nbrNum)
-    {
-      break;
+      //设置端口复用
+      int opt = 1;
+      res = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+      //设置对方地址结构
+      struct sockaddr_in their_addr;
+      their_addr.sin_family = AF_INET;
+      their_addr.sin_port = htons(CONNECTION_PORT);
+      their_addr.sin_addr.s_addr = nt[i].nodeIP;
+      //连接到对方
+      res = connect(sockfd, (struct sockaddr*)&their_addr, sizeof(struct sockaddr));
+      if (res == -1) {
+        printf("connect to node %d failed, ip:%s\n", nt[i].nodeID, inet_ntoa(their_addr.sin_addr));
+        perror("connect");
+        exit(0);
+      }
+      nt_addconn(nt, nt[i].nodeID, sockfd);
+      printf("connect to node %d, fd:%d\n", nt[i].nodeID, nt[i].conn);
     }
   }
   return 1;
