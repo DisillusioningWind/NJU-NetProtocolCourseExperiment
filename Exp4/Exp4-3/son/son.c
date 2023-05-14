@@ -52,6 +52,13 @@ void* waitNbrs(void* arg) {
 	perror("socket");
 	exit(1);
   }
+  //设置端口复用
+  int opt = 1;
+  res = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+  if (res == -1) {
+  perror("setsockopt");
+  exit(1);
+  }
   //设置本地地址结构
   my_addr.sin_family = AF_INET;
   my_addr.sin_port = htons(CONNECTION_PORT);
