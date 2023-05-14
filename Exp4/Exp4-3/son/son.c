@@ -24,7 +24,7 @@
 #include "neighbortable.h"
 
 //你应该在这个时间段内启动所有重叠网络节点上的SON进程
-#define SON_START_DELAY 60
+#define SON_START_DELAY 30
 
 /**************************************************************/
 //声明全局变量
@@ -313,6 +313,7 @@ int main() {
 
   //此时, 所有与邻居之间的连接都建立好了
   printf("Overlay network: all neighbors connected...\n");
+  exit(0);
 	
   //创建线程监听所有邻居
   for(int i=0;i<nbrSumNum;i++) {
