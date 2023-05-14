@@ -176,7 +176,7 @@ void* listen_to_neighbor(void* arg) {
     if (res == -1) {
       printf("recvpkt id:%d\n", pkt.header.src_nodeID);
       perror("recv");
-      continue;
+      return NULL;
     }
     if(sip_conn != -1)
     {
@@ -184,7 +184,7 @@ void* listen_to_neighbor(void* arg) {
       res = forwardpktToSIP(&pkt, sip_conn);
       if (res == -1) {
         perror("send");
-        continue;
+        return NULL;
       }
     }
   }
@@ -236,6 +236,7 @@ void waitSIP() {
     res = getpktToSend(&arg, &nextNodeID, sip_conn);
     if (res == -1) {
       //如果SIP进程关闭了连接, 重新等待SIP进程的连接
+      printf("sip closed\n");
       close(sip_conn);
       goto start;
     }
