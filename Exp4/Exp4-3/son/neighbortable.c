@@ -21,20 +21,36 @@ nbr_entry_t* nt_create()
     nt[i].conn = -1;
     struct in_addr addr;
     addr.s_addr = nbrIP[i];
-    printf("nodeID:%d\tnodeIP:%s\n", nt[i].nodeID, inet_ntoa(addr));
+    // printf("nodeID:%d nodeIP:%s\n", nt[i].nodeID, inet_ntoa(addr));
   }
-  exit(0);
   return nt;
 }
 
 //这个函数删除一个邻居表. 它关闭所有连接, 释放所有动态分配的内存.
 void nt_destroy(nbr_entry_t* nt)
 {
-  return;
+  nbr_entry_t *entry = nt;
+  while(entry != NULL)
+  {
+    if (entry->conn != -1)
+      close(entry->conn);
+    entry++;
+  }
+  free(nt);
 }
 
 //这个函数为邻居表中指定的邻居节点条目分配一个TCP连接. 如果分配成功, 返回1, 否则返回-1.
 int nt_addconn(nbr_entry_t* nt, int nodeID, int conn)
 {
-  return 0;
+  nbr_entry_t* entry = nt;
+  while(entry != NULL && entry->nodeID != nodeID)
+  {
+    entry++;
+  }
+  if (entry != NULL)
+  {
+    entry->conn = conn;
+    return 1;
+  }
+  return -1;
 }

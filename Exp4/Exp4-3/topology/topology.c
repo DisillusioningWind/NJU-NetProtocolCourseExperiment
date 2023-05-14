@@ -13,21 +13,24 @@
 int topology_getNodeIDfromname(char* hostname) 
 {
   struct hostent* host = gethostbyname(hostname);
-  if (host == NULL) return -1;
-  char** pptr = host->h_addr_list;
-  uint32_t addr;
-  int last;
-  for (; *pptr != NULL; pptr++)
+  if (host != NULL)
   {
-    addr = ntohl(*((uint32_t *)(*pptr)));
-    struct in_addr in;
-    in.s_addr = (*((uint32_t *)(*pptr)));
-    printf("nodeIP:%s\n", inet_ntoa(in));
-    last = (addr & 0xff);
-    if(last != 1) break;
+    char** pptr = host->h_addr_list;
+    uint32_t addr;
+    int last;
+    for (; *pptr != NULL; pptr++)
+    {
+      addr = ntohl(*((uint32_t *)(*pptr)));
+      last = (addr & 0xff);
+      if(last != 1)
+        return last;
+      // struct in_addr in;
+      // in.s_addr = (*((uint32_t *)(*pptr)));
+      // printf("nodeIP:%s\n", inet_ntoa(in));
+    }
   }
-  // printf("getNodeID:%d\n",last);
-  return last;
+  printf("This host doesn't seem to have a valid IP address, hostname:%s\n", hostname);
+  return -1;
 }
 
 //这个函数返回指定的IP地址的节点ID.
@@ -46,7 +49,7 @@ int topology_getIDIPfromname(char *hostname, in_addr_t *addr, int *id)
   struct hostent *host = gethostbyname(hostname);
   if (host == NULL)
   {
-    printf("gethostbyname error: %s\n", strerror(errno));
+    printf("can't get host by name, hostname:%s\n", hostname);
     return -1;
   }
   uint32_t addr_net = ntohl(*((uint32_t *)host->h_addr_list[0]));
@@ -71,7 +74,7 @@ int topology_getNbrNum()
 {
   char hostname[MAX_NAME_LEN];
   gethostname(hostname, sizeof(hostname));
-  FILE* fp = fopen("topology.dat", "r");
+  FILE *fp = fopen("./topology/topology.dat", "r");
   if (fp == NULL) return -1;
   int nbrNum = 0;
   char line[MAX_LINE_LEN];
