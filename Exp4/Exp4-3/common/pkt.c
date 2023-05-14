@@ -90,7 +90,7 @@ int son_recvpkt(sip_pkt_t* pkt, int son_conn)
 
 int getpktToSend(sip_pkt_t* pkt, int* nextNode,int sip_conn)
 {
-  int res = 1;
+  int res = 1, len = 0;
   int state = PKTSTART1;
   sendpkt_arg_t sendpkt_arg;
   char c;
@@ -108,7 +108,12 @@ int getpktToSend(sip_pkt_t* pkt, int* nextNode,int sip_conn)
       else state = PKTSTART1;
       break;
     case PKTRECV:
-      res = recv(sip_conn, &sendpkt_arg, sizeof(sendpkt_arg_t), 0);
+      while(len < sizeof(sendpkt_arg_t))
+      {
+        res = recv(sip_conn, &sendpkt_arg + len, sizeof(sendpkt_arg_t) - len, 0);
+        if(res <= 0) return -1;
+        len += res;
+      }
       state = PKTSTOP1;
       break;
     case PKTSTOP1:
@@ -157,7 +162,6 @@ int sendpkt(sip_pkt_t* pkt, int conn)
   res = send(conn, "!&", 2, 0);
   if (res <= 0) return -1;
   res = send(conn, pkt, sizeof(sip_pkt_t), 0);
-  printf("sendpkt: %d\n", res);
   if (res <= 0) return -1;
   res = send(conn, "!#", 2, 0);
   return res > 0 ? 1 : -1;
@@ -194,7 +198,6 @@ int recvpkt(sip_pkt_t* pkt, int conn)
       while(len < sizeof(sip_pkt_t))
       {
         res = recv(conn, pkt + len, sizeof(sip_pkt_t) - len, 0);
-        printf("recvpkt: %d\n", res);
         if(res <= 0) return -1;
         len += res;
       }
@@ -202,13 +205,11 @@ int recvpkt(sip_pkt_t* pkt, int conn)
       break;
     case PKTSTOP1:
       res = recv(conn, &c, 1, 0);
-      printf("recvpkt: %c\n", c);
       if(c == '!') state = PKTSTOP2;
       else return -1;
       break;
     case PKTSTOP2:
       res = recv(conn, &c, 1, 0);
-      printf("recvpkt: %c\n", c);
       if(c == '#') return 1;
       else return -1;
       break;
