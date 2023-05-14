@@ -14,8 +14,15 @@ int topology_getNodeIDfromname(char* hostname)
 {
   struct hostent* host = gethostbyname(hostname);
   if (host == NULL) return -1;
-  uint32_t addr = ntohl(*((uint32_t *)host->h_addr_list[1]));
-  int last = (addr & 0xff);
+  char** pptr = host->h_addr_list;
+  uint32_t addr;
+  int last;
+  for (; *pptr != NULL; pptr++)
+  {
+    addr = ntohl(*((uint32_t *)pptr));
+    last = (addr & 0xff);
+    if(last != 1) break;
+  }
   // printf("getNodeID:%d\n",last);
   return last;
 }
