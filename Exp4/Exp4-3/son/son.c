@@ -143,9 +143,10 @@ int connectNbrs() {
         res = connect(sockfd, (struct sockaddr*)&their_addr, sizeof(struct sockaddr));
         if (res == -1) {
           perror("connect");
-          continue;
+          exit(0);
         }
         nt_addconn(nt, nt[i].nodeID, sockfd);
+        printf("connect to node %d, fd:%d\n", nt[i].nodeID, nt[i].conn);
         conNum++;
       }
     }
