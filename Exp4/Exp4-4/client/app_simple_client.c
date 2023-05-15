@@ -36,16 +36,26 @@
 
 //这个函数连接到本地SIP进程的端口SIP_PORT. 如果TCP连接失败, 返回-1. 连接成功, 返回TCP套接字描述符, STCP将使用该描述符发送段.
 int connectToSIP() {
-
-	//你需要编写这里的代码.
-	
+	int sockfd, rt;
+	// 创建TCP套接字
+	sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	// 设置端口复用
+	int opt = 1;
+	setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+	// 填充客户端套接字地址
+	struct sockaddr_in servaddr;
+	memset(&servaddr, 0, sizeof(servaddr));
+	servaddr.sin_family = AF_INET;
+	servaddr.sin_port = htons(SIP_PORT);
+	inet_pton(AF_INET, "127.0.0.1", &servaddr.sin_addr);
+	// 连接到服务器
+	rt = connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr));
+	return rt >= 0 ? sockfd : -1;
 }
 
 //这个函数断开到本地SIP进程的TCP连接. 
 void disconnectToSIP(int sip_conn) {
-
-	//你需要编写这里的代码.
-	
+	close(sip_conn);
 }
 
 int main() {
