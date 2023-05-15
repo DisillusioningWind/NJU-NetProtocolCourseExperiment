@@ -61,26 +61,38 @@ int connectToSON() {
 //在本实验中, 这个线程只广播空的路由更新报文给所有邻居, 
 //我们通过设置SIP报文首部中的dest_nodeID为BROADCAST_NODEID来发送广播
 void* routeupdate_daemon(void* arg) {
+  int res;
   sip_pkt_t pkt;
   pkt.header.src_nodeID = topology_getMyNodeID();
   pkt.header.dest_nodeID = BROADCAST_NODEID;
   pkt.header.type = ROUTE_UPDATE;
   pkt.header.length = 0;
   while (1) {
-	sleep(ROUTEUPDATE_INTERVAL);
-	son_sendpkt(BROADCAST_NODEID, &pkt, son_conn);
+    sleep(ROUTEUPDATE_INTERVAL);
+    if(son_conn > 0)
+    {
+      res = son_sendpkt(BROADCAST_NODEID, &pkt, son_conn);
+      if (res == -1) {
+        close(son_conn);
+        son_conn = -1;
+        return NULL;
+      }
+    }
+	else
+	  return NULL;
   }
-  return 0;
+  return NULL;
 }
 
 //这个线程处理来自SON进程的进入报文
 //它通过调用son_recvpkt()接收来自SON进程的报文
 //在本实验中, 这个线程在接收到报文后, 只是显示报文已接收到的信息, 并不处理报文 
 void* pkthandler(void* arg) {
+	int res = 1;
 	sip_pkt_t pkt;
-
-	while(son_recvpkt(&pkt,son_conn)>0) {
-		printf("Routing: received a packet from neighbor %d\n",pkt.header.src_nodeID);
+	while(res > 0 && son_conn > 0) {
+	    res = son_recvpkt(&pkt, son_conn);
+		printf("Routing: received a packet from neighbor %d\n", pkt.header.src_nodeID);
 	}
 	close(son_conn);
 	son_conn = -1;
@@ -90,7 +102,7 @@ void* pkthandler(void* arg) {
 //这个函数终止SIP进程, 当SIP进程收到信号SIGINT时会调用这个函数. 
 //它关闭所有连接, 释放所有动态分配的内存.
 void sip_stop() {
-	if(son_conn>0) {
+	if(son_conn > 0) {
 		close(son_conn);
 		son_conn = -1;
 	}

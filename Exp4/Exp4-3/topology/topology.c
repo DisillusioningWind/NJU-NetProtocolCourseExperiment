@@ -29,7 +29,7 @@ int topology_getNodeIDfromname(char* hostname)
       // printf("nodeIP:%s\n", inet_ntoa(in));
     }
   }
-  printf("This host doesn't seem to have a valid IP address, hostname:%s\n", hostname);
+  printf("Can't get host by name, hostname:%s\n", hostname);
   return -1;
 }
 
@@ -39,7 +39,6 @@ int topology_getNodeIDfromip(struct in_addr addr)
 {
   uint32_t addr_net = ntohl(addr.s_addr);
   int last = addr_net & 0xff;
-  // printf("getNodeID:%d\n", last);
   return last;
 }
 
@@ -49,13 +48,13 @@ int topology_getIDIPfromname(char *hostname, in_addr_t *addr, int *id)
   struct hostent *host = gethostbyname(hostname);
   if (host == NULL)
   {
-    printf("can't get host by name, hostname:%s\n", hostname);
+    printf("Can't get host by name, hostname:%s\n", hostname);
     return -1;
   }
   uint32_t addr_net = ntohl(*((uint32_t *)host->h_addr_list[0]));
   *addr = *((uint32_t *)host->h_addr_list[0]);
   *id = addr_net & 0xff;
-  // printf("nodeID:%d\tnodeIP:%x\n", *id, *addr);
+  // printf("nodeID:%d nodeIP:%x\n", *id, *addr);
   return 0;
 }
 
@@ -107,7 +106,7 @@ void add_if_notFind(char nodes[][MAX_NAME_LEN], int* num_nodes, char* node)
 int topology_getNodeNum()
 {
   //topology.dat数据格式为 hostname1 hostname2 cost，你要计算的总节点数不算重复的
-  char filename[] = "topology.dat";
+  char filename[] = "./topology/topology.dat";
   char line[MAX_LINE_LEN];
   char nodes[MAX_NODE_NUM][MAX_NAME_LEN];
   char node1[MAX_NAME_LEN], node2[MAX_NAME_LEN];
@@ -133,7 +132,7 @@ int topology_getNodeNum()
 //返回一个动态分配的数组, 它包含重叠网络中所有节点的ID. 
 int* topology_getNodeArray()
 {
-  char filename[] = "topology.dat";
+  char filename[] = "./topology/topology.dat";
   char line[MAX_LINE_LEN];
   char nodes[MAX_NODE_NUM][MAX_NAME_LEN];
   char node1[MAX_NAME_LEN], node2[MAX_NAME_LEN];
@@ -175,7 +174,7 @@ int topology_getNbrArray(int ids[], in_addr_t ips[], int* num)
 
   FILE *fp = fopen(filename, "r");
   if (fp == NULL) return -1;
-  printf("hostname: %s\n", hostname);
+  printf("Your hostname: %s\n", hostname);
   while (fgets(line, sizeof(line), fp) != NULL)
   {
     if (sscanf(line, "%s %s %d", node1, node2, &cost) == 3)

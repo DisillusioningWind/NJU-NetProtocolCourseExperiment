@@ -37,7 +37,8 @@ int son_sendpkt(int nextNodeID, sip_pkt_t* pkt, int son_conn)
 // 如果成功接收报文, 返回1, 否则返回-1.
 int son_recvpkt(sip_pkt_t* pkt, int son_conn)
 {
-  int res = 1, len = 0;
+  int res = 1;
+  size_t len = 0;
   int state = PKTSTART1;
   char c;
   while(res > 0)
@@ -56,9 +57,9 @@ int son_recvpkt(sip_pkt_t* pkt, int son_conn)
     case PKTRECV:
       while(len < sizeof(sip_pkt_t))
       {
-        res = recv(son_conn, pkt + len, sizeof(sip_pkt_t) - len, 0);
+        res = recv(son_conn, ((char*)pkt) + len, sizeof(sip_pkt_t) - len, 0);
         if(res <= 0) return -1;
-        len += res;
+        len += (size_t)res;
       }
       state = PKTSTOP1;
       break;
@@ -90,7 +91,8 @@ int son_recvpkt(sip_pkt_t* pkt, int son_conn)
 
 int getpktToSend(sip_pkt_t* pkt, int* nextNode,int sip_conn)
 {
-  int res = 1, len = 0;
+  int res = 1;
+  size_t len = 0;
   int state = PKTSTART1;
   sendpkt_arg_t sendpkt_arg;
   char c;
@@ -110,9 +112,9 @@ int getpktToSend(sip_pkt_t* pkt, int* nextNode,int sip_conn)
     case PKTRECV:
       while(len < sizeof(sendpkt_arg_t))
       {
-        res = recv(sip_conn, &sendpkt_arg + len, sizeof(sendpkt_arg_t) - len, 0);
+        res = recv(sip_conn, ((char*)&sendpkt_arg) + len, sizeof(sendpkt_arg_t) - len, 0);
         if(res <= 0) return -1;
-        len += res;
+        len += (size_t)res;
       }
       state = PKTSTOP1;
       break;
@@ -178,7 +180,8 @@ int sendpkt(sip_pkt_t* pkt, int conn)
 // 如果成功接收报文, 返回1, 否则返回-1.
 int recvpkt(sip_pkt_t* pkt, int conn)
 {
-  int res = 1, len = 0;
+  int res = 1;
+  size_t len = 0;
   char buf[1600];
   int state = PKTSTART1;
   char c;
@@ -198,9 +201,9 @@ int recvpkt(sip_pkt_t* pkt, int conn)
     case PKTRECV:
       while(len < sizeof(sip_pkt_t))
       {
-        res = recv(conn, (char*)(buf + len), sizeof(sip_pkt_t) - len, 0);
+        res = recv(conn, buf + len, sizeof(sip_pkt_t) - len, 0);
         if(res <= 0) return -1;
-        len += res;
+        len += (size_t)res;
       }
       memcpy(pkt, buf, sizeof(sip_pkt_t));
       state = PKTSTOP1;

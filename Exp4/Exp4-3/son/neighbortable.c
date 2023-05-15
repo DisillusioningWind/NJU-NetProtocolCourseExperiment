@@ -8,11 +8,11 @@
 //返回创建的邻居表.
 nbr_entry_t* nt_create()
 {
-  int nbrNum = 0;
+  int nbrNum = 0, res = 0;
   int nbrID[MAX_NODE_NUM];
   in_addr_t nbrIP[MAX_NODE_NUM];
-  topology_getNbrArray(nbrID, nbrIP, &nbrNum);
-  // printf("nbrNum:%d\n", nbrNum);
+  res = topology_getNbrArray(nbrID, nbrIP, &nbrNum);
+  if (res == -1) return NULL;
   nbr_entry_t* nt = (nbr_entry_t*)malloc(sizeof(nbr_entry_t) * nbrNum);
   for (int i = 0; i < nbrNum; i++)
   {
@@ -23,6 +23,7 @@ nbr_entry_t* nt_create()
     // addr.s_addr = nbrIP[i];
     // printf("nodeID:%d nodeIP:%s\n", nt[i].nodeID, inet_ntoa(addr));
   }
+  // printf("nbrNum:%d\n", nbrNum);
   return nt;
 }
 
@@ -32,9 +33,11 @@ void nt_destroy(nbr_entry_t* nt)
   int nbrNum = topology_getNbrNum();
   for (int i = 0; i < nbrNum; i++)
   {
-    close(nt[i].conn);
+    if(nt[i].conn != -1)
+      close(nt[i].conn);
   }
   free(nt);
+  nt = NULL;
 }
 
 //这个函数为邻居表中指定的邻居节点条目分配一个TCP连接. 如果分配成功, 返回1, 否则返回-1.

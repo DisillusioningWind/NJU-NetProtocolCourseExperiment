@@ -32,6 +32,7 @@
 
 //将邻居表声明为一个全局变量 
 nbr_entry_t* nt;
+//邻居表中的邻居数
 int nbrSumNum = 0;
 //将与SIP进程之间的TCP连接声明为一个全局变量
 int sip_conn; 
@@ -50,15 +51,15 @@ void* waitNbrs(void* arg) {
   //创建TCP套接字
   sockfd = socket(AF_INET, SOCK_STREAM, 0);
   if (sockfd < 0) {
-	perror("socket");
-	exit(1);
+	  perror("socket");
+	  exit(1);
   }
   //设置端口复用
   int opt = 1;
   res = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
   if (res == -1) {
-  perror("setsockopt");
-  exit(1);
+    perror("setsockopt");
+    exit(1);
   }
   //设置本地地址结构
   my_addr.sin_family = AF_INET;
@@ -67,14 +68,14 @@ void* waitNbrs(void* arg) {
   //绑定TCP套接字到本地地址结构
   res = bind(sockfd, (struct sockaddr*)&my_addr, sizeof(struct sockaddr));
   if (res == -1) {
-	perror("bind");
-	exit(1);
+	  perror("bind");
+	  exit(1);
   }
   //监听TCP套接字
   res = listen(sockfd, MAX_NODE_NUM);
   if (res == -1) {
-	perror("listen");
-	exit(1);
+	  perror("listen");
+	  exit(1);
   }
   //获得ID比自己大的邻居的数量
   myNodeID = topology_getMyNodeID();
@@ -84,10 +85,8 @@ void* waitNbrs(void* arg) {
       nbrNum++;
     }
   }
-  if(nbrNum == 0)
-  {
-    return NULL;
-  }
+  //没有ID比自己大的邻居
+  if(nbrNum == 0) return NULL;
   //接受来自邻居的连接
   int conNum = 0;
   while (1) {
@@ -127,6 +126,8 @@ int connectNbrs() {
     if (nt[i].nodeID < myNodeID)
       nbrNum++;
   }
+  //没有ID比自己小的邻居
+  if(nbrNum == 0) return 1;
   //连接到ID比自己小的邻居
   for(int i = 0; i < nbrSumNum; i++)
   {
@@ -176,6 +177,9 @@ void* listen_to_neighbor(void* arg) {
     if (res == -1) {
       // printf("recvpkt id:%d\n", pkt.header.src_nodeID);
       // perror("recv");
+      close(connfd);
+      nt[idx].conn = -1;
+      printf("close conn to node %d\n", nt[idx].nodeID);
       return NULL;
     }
     if(sip_conn != -1)
@@ -197,7 +201,6 @@ void* listen_to_neighbor(void* arg) {
 void waitSIP() {
   int sockfd, res;
   struct sockaddr_in my_addr;
-  start:
   //创建TCP套接字
   sockfd = socket(AF_INET, SOCK_STREAM, 0);
   if (sockfd < 0) {
@@ -223,6 +226,7 @@ void waitSIP() {
     perror("listen");
     exit(1);
   }
+  reaccept:
   //接受来自SIP进程的连接
   sip_conn = accept(sockfd, NULL, NULL);
   if (sip_conn == -1) {
@@ -238,11 +242,13 @@ void waitSIP() {
       //如果SIP进程关闭了连接, 重新等待SIP进程的连接
       printf("sip closed\n");
       close(sip_conn);
-      goto start;
+      sip_conn = -1;
+      goto reaccept;
     }
     //如果下一跳的节点ID为BROADCAST_NODEID, 报文应发送到所有邻居节点
     if (nextNodeID == BROADCAST_NODEID) {
       for (int i = 0; i < nbrSumNum; i++) {
+        if(nt[i].conn == -1) continue;
         res = sendpkt(&arg, nt[i].conn);
         if (res == -1) {
           perror("send");
@@ -254,13 +260,15 @@ void waitSIP() {
       //将报文发送到重叠网络中的下一跳
       for (int i = 0; i < nbrSumNum; i++) {
         if (nt[i].nodeID == nextNodeID) {
+          //如果下一跳的TCP连接已经关闭，直接不管
+          if(nt[i].conn == -1) break;
           res = sendpkt(&arg, nt[i].conn);
           if (res == -1) {
             perror("send");
             continue;
           }
+          break;
         }
-        break;
       }
     }
   }
@@ -270,14 +278,10 @@ void waitSIP() {
 //这个函数停止重叠网络, 当接收到信号SIGINT时, 该函数被调用.
 //它关闭所有的连接, 释放所有动态分配的内存.
 void son_stop() {
-  //关闭所有连接
-  for (int i = 0; i < nbrSumNum; i++) {
-    close(nt[i].conn);
-  }
   //释放所有动态分配的内存
   nt_destroy(nt);
   //关闭与SIP进程的连接
-  close(sip_conn);
+  if(sip_conn != -1) close(sip_conn);
   exit(0);
 }
 
@@ -287,6 +291,10 @@ int main() {
 
   //创建一个邻居表
   nt = nt_create();
+  if(nt == NULL) {
+    printf("Open topology file failed\n");
+    exit(1);
+  }
   nbrSumNum = topology_getNbrNum();
   //将sip_conn初始化为-1, 即还未与SIP进程连接
   sip_conn = -1;
