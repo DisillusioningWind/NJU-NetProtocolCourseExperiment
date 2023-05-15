@@ -73,4 +73,11 @@
 
 //路由更新广播间隔, 以秒为单位
 #define ROUTEUPDATE_INTERVAL 5
+
+//tppology.dat文件的相对路径
+#define TOPOLOGY_FILE "./topology/topology.dat"
+//tppology.dat文件中的最大行长度
+#define MAX_LINE_LEN 100
+//tppology.dat文件中的最大节点名长度
+#define MAX_NAME_LEN 20
 #endif

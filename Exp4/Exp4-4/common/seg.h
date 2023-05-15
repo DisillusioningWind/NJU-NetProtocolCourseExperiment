@@ -7,6 +7,9 @@
 #define SEG_H
 
 #include "constants.h"
+#include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 //段类型定义, 用于STCP.
 #define	SYN 0
@@ -50,10 +53,12 @@ typedef struct sendsegargument {
 //如果sendseg_arg_t发送成功,就返回1,否则返回-1.
 int sip_sendseg(int sip_conn, int dest_nodeID, seg_t* segPtr);
 
-//STCP进程使用这个函数来接收来自SIP进程的包含段及其源节点ID的sendseg_arg_t结构.
-//参数sip_conn是STCP进程和SIP进程之间连接的TCP描述符.
-//当接收到段时, 使用seglost()来判断该段是否应被丢弃并检查校验和.
-//如果成功接收到sendseg_arg_t就返回1, 否则返回-1.
+/// @brief 通过重叠网络(在本实验中，是一个TCP连接)接收STCP段
+/// @param connection TCP连接描述符
+/// @param segPtr 用于接收的STCP段指针
+/// @retval 1: 丢弃接收到的STCP段
+/// @retval 0: 接收到正确的STCP段
+/// @retval -1: TCP连接出错或已关闭
 int sip_recvseg(int sip_conn, int* src_nodeID, seg_t* segPtr);
 
 //SIP进程使用这个函数接收来自STCP进程的包含段及其目的节点ID的sendseg_arg_t结构.
