@@ -54,7 +54,8 @@ typedef struct sendsegargument {
 int sip_sendseg(int sip_conn, int dest_nodeID, seg_t* segPtr);
 
 /// @brief 通过重叠网络(在本实验中，是一个TCP连接)接收STCP段
-/// @param connection TCP连接描述符
+/// @param sip_conn TCP连接描述符
+/// @param src_nodeID STCP段的源节点ID
 /// @param segPtr 用于接收的STCP段指针
 /// @retval 1: 丢弃接收到的STCP段
 /// @retval 0: 接收到正确的STCP段
