@@ -184,7 +184,7 @@ void *seghandler(void *arg)
         seg.header.type = SYNACK;
         seg.header.seq_num = tcb_list[sockfd]->expect_seqNum;
         seg.header.checksum = checksum(&seg);
-        sip_sendseg(sip_conn, &srcID, &seg);
+        sip_sendseg(sip_conn, srcID, &seg);
         printf("Server send SYNACK to %d\n", srcID);
       }
       break;
@@ -198,7 +198,7 @@ void *seghandler(void *arg)
         seg.header.type = FINACK;
         seg.header.seq_num = tcb_list[sockfd]->expect_seqNum;
         seg.header.checksum = checksum(&seg);
-        sip_sendseg(sip_conn, &srcID, &seg);
+        sip_sendseg(sip_conn, srcID, &seg);
         printf("Server send FINACK to %d\n", srcID);
       }
       else if (seg.header.type == SYN)
@@ -210,7 +210,7 @@ void *seghandler(void *arg)
         seg.header.type = SYNACK;
         seg.header.seq_num = tcb_list[sockfd]->expect_seqNum;
         seg.header.checksum = checksum(&seg);
-        sip_sendseg(sip_conn, &srcID, &seg);
+        sip_sendseg(sip_conn, srcID, &seg);
         printf("Server send SYNACK\n");
       }
       else if (seg.header.type == DATA)
@@ -242,7 +242,7 @@ void *seghandler(void *arg)
         seg.header.seq_num = tcb_list[sockfd]->expect_seqNum;
         seg.header.type = DATAACK;
         seg.header.checksum = checksum(&seg);
-        sip_sendseg(sip_conn, &srcID, &seg);
+        sip_sendseg(sip_conn, srcID, &seg);
         printf("Server send DATAACK\n");
       }
       break;
@@ -255,7 +255,7 @@ void *seghandler(void *arg)
         seg.header.type = FINACK;
         seg.header.seq_num = tcb_list[sockfd]->expect_seqNum;
         seg.header.checksum = checksum(&seg);
-        sip_sendseg(sip_conn, &srcID, &seg);
+        sip_sendseg(sip_conn, srcID, &seg);
         printf("Server send FINACK\n");
       }
       break;
