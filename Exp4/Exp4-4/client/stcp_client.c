@@ -424,3 +424,12 @@ void *sendBuf_timer(void *clienttcb)
   printf("Client sendBuf empty\n");
   return NULL;
 }
+
+/// @brief 获取当前时间
+/// @return 当前时间，进度为秒
+unsigned int get_time_now()
+{
+  time_t now;
+  time(&now);
+  return (unsigned int)now;
+}
