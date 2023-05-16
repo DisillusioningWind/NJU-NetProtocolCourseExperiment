@@ -403,7 +403,7 @@ void *sendBuf_timer(void *clienttcb)
     pthread_mutex_unlock(tcb_list[sockfd]->bufMutex);
     unsigned int now = get_time_now();
     // 如果第一个已发送但未被确认段的发送时间超过DATA_TIMEOUT时间，则重传所有已发送但未被确认段
-    if (now - segBuf->sentTime > DATA_TIMEOUT / 10000)
+    if (now - segBuf->sentTime > DATA_TIMEOUT / 5000)
     {
       pthread_mutex_lock(tcb_list[sockfd]->bufMutex);
       segBuf = tcb_list[sockfd]->sendBufHead;
