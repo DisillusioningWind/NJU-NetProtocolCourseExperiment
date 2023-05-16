@@ -126,6 +126,8 @@ void* pkthandler(void* arg) {
 		{
 			if (pkt.header.dest_nodeID == myID)
 			{
+				if(stcp_conn < 0)
+				   continue;
 				// 转发给STCP
 				memcpy(&seg, pkt.data, sizeof(seg_t));
 				res = forwardsegToSTCP(stcp_conn, pkt.header.src_nodeID, &seg);
