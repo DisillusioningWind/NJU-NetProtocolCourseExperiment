@@ -126,6 +126,7 @@ void* pkthandler(void* arg) {
 		{
 			if (pkt.header.dest_nodeID == myID)
 			{
+				// 转发给STCP
 				memcpy(&seg, pkt.data, sizeof(seg_t));
 				res = forwardsegToSTCP(stcp_conn, pkt.header.src_nodeID, &seg);
 				if (res == -1)
@@ -138,6 +139,7 @@ void* pkthandler(void* arg) {
 			}
 			else
 			{
+				// 转发给下一跳
 				pthread_mutex_lock(routingtable_mutex);
 				int next = routingtable_getnextnode(routingtable, pkt.header.dest_nodeID);
 				pthread_mutex_unlock(routingtable_mutex);
@@ -146,6 +148,7 @@ void* pkthandler(void* arg) {
 					printf("no route to node %d\n", pkt.header.dest_nodeID);
 					continue;
 				}
+				printf("forward SIP packet for node %d to %d\n", pkt.header.dest_nodeID, next);
 				res = son_sendpkt(next, &pkt, son_conn);
 				if (res == -1)
 				{
@@ -156,17 +159,27 @@ void* pkthandler(void* arg) {
 				}
 			}
 		}
-		else if (pkt.header.type == ROUTE_UPDATE)
+		else if (pkt.header.type == ROUTE_UPDATE || pkt.header.type == CLOSE)
 		{
 			int i;
 			int srcID = pkt.header.src_nodeID;
 			pthread_mutex_lock(dv_mutex);
 			//更新来源节点的距离矢量
-			for(i = 0; i < nbrNum + 1; i++)
+			for (i = 0; i < nbrNum + 1; i++)
 			{
-				if(srcID == dv[i].nodeID)
+				if (srcID == dv[i].nodeID)
 				{
-					memcpy(dv[i].dvEntry, pkt.data, sizeof(dv_entry_t) * sumNum);
+					if(pkt.header.type == CLOSE)
+					{
+						for(int j = 0; j < sumNum; j++)
+						{
+							dv[i].dvEntry[j].cost = INFINITE_COST;
+						}
+					}
+					else
+					{
+					    memcpy(dv[i].dvEntry, pkt.data, sizeof(dv_entry_t) * sumNum);
+					}
 					break;
 				}
 			}
@@ -205,6 +218,26 @@ void* pkthandler(void* arg) {
 //这个函数终止SIP进程, 当SIP进程收到信号SIGINT时会调用这个函数. 
 //它关闭所有连接, 释放所有动态分配的内存.
 void sip_stop() {
+	sip_pkt_t pkt;
+	pkt.header.src_nodeID = myID;
+	pkt.header.dest_nodeID = BROADCAST_NODEID;
+	pkt.header.type = ROUTE_UPDATE;
+	//更新自己的距离矢量
+	pthread_mutex_lock(dv_mutex);
+	for(int i = 0; i < sumNum; i++)
+	{
+		dv[nbrNum].dvEntry[i].cost = INFINITE_COST;
+	}
+	//发送路由更新报文
+	memcpy(pkt.data, dv[nbrNum].dvEntry, sizeof(dv_entry_t) * sumNum);
+	pthread_mutex_unlock(dv_mutex);
+	pkt.header.length = sizeof(dv_entry_t) * sumNum;
+	int res = son_sendpkt(BROADCAST_NODEID, &pkt, son_conn);
+	if(res == -1)
+	{
+		perror("son_sendpkt");
+	}
+	//关闭连接
 	if(son_conn > 0)
 		close(son_conn);
 	if(stcp_conn > 0)

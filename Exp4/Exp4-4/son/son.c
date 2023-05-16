@@ -26,20 +26,12 @@
 // 你应该在这个时间段内启动所有重叠网络节点上的SON进程
 #define SON_START_DELAY 25
 
-/**************************************************************/
-// 声明全局变量
-/**************************************************************/
-
 // 将邻居表声明为一个全局变量
 nbr_entry_t *nt;
 // 邻居表中的邻居数
 int nbrSumNum = 0;
 // 将与SIP进程之间的TCP连接声明为一个全局变量
 int sip_conn;
-
-/**************************************************************/
-// 实现重叠网络函数
-/**************************************************************/
 
 // 这个线程打开TCP端口CONNECTION_PORT, 等待节点ID比自己大的所有邻居的进入连接,
 // 在所有进入连接都建立后, 这个线程终止.
@@ -313,6 +305,18 @@ reaccept:
 // 它关闭所有的连接, 释放所有动态分配的内存.
 void son_stop()
 {
+	//发送该节点不可达的sip报文
+	sip_pkt_t pkt;
+	pkt.header.type = CLOSE;
+	pkt.header.src_nodeID = myID;
+	pkt.header.dest_nodeID = BROADCAST_NODEID;
+	pkt.header.length = 0;
+	for (int i = 0; i < nbrSumNum; i++)
+	{
+		if (nt[i].conn == -1)
+			continue;
+		int res = sendpkt(&pkt, nt[i].conn);
+	}
 	// 释放所有动态分配的内存
 	nt_destroy(nt);
 	// 关闭与SIP进程的连接

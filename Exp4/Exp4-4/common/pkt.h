@@ -9,6 +9,7 @@
 //报文类型定义, 用于报文首部中的type字段
 #define	ROUTE_UPDATE 1
 #define SIP 2	
+#define CLOSE 3
 
 //SIP报文格式定义
 typedef struct sipheader {
