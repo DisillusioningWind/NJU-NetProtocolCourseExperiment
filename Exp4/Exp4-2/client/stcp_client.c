@@ -125,8 +125,8 @@ int stcp_client_send(int sockfd, void* data, unsigned int length)
     printf("stcp_client_send: sockfd error\n");
     return -1;
   }
-  printf("Client send data in\n");
-  printf("Client send length: %d\n", length);
+  // printf("Client send data in\n");
+  // printf("Client send length: %d\n", length);
   
   //将数据分段
   int segCnt = length / MAX_SEG_LEN + (length % MAX_SEG_LEN != 0 ? 1 : 0);
@@ -168,7 +168,7 @@ int stcp_client_send(int sockfd, void* data, unsigned int length)
     tcb_list[sockfd]->next_seqNum += segLen;
   }
   //从发送缓冲区中第一个未发送段开始发送，直到已发送但未被确认数据段的数目到达GBN_WINDOW
-  printf("unAck_segNum: %d\n", tcb_list[sockfd]->unAck_segNum);
+  // printf("unAck_segNum: %d\n", tcb_list[sockfd]->unAck_segNum);
   struct timeval tv, rtv;
   tv.tv_sec = 0;
   tv.tv_usec = 1000; // 1us = 1000ns
@@ -200,7 +200,7 @@ int stcp_client_send(int sockfd, void* data, unsigned int length)
       tcb_list[sockfd]->unAck_segNum++;
     }
   }
-  printf("Client send data out\n");
+  // printf("Client send data out\n");
   return 1;
 }
 
@@ -397,7 +397,7 @@ void* sendBuf_timer(void* clienttcb)
   int sockfd = (int)clienttcb;
   struct timeval tv,rtv;
   tv.tv_sec = 0;
-  tv.tv_usec = SENDBUF_POLLING_INTERVAL / 1000;// 1us = 1000ns
+  tv.tv_usec = SENDBUF_POLLING_INTERVAL / 10000;// 1us = 1000ns
 
   while (1)
   {
@@ -415,7 +415,7 @@ void* sendBuf_timer(void* clienttcb)
     pthread_mutex_unlock(tcb_list[sockfd]->bufMutex);
     unsigned int now = get_time_now();
     //如果第一个已发送但未被确认段的发送时间超过DATA_TIMEOUT时间，则重传所有已发送但未被确认段
-    if (now - segBuf->sentTime > DATA_TIMEOUT / 1000000000)
+    if (now - segBuf->sentTime > DATA_TIMEOUT / 1000000)
     {
       pthread_mutex_lock(tcb_list[sockfd]->bufMutex);
       segBuf = tcb_list[sockfd]->sendBufHead;
@@ -433,7 +433,7 @@ void* sendBuf_timer(void* clienttcb)
       pthread_mutex_unlock(tcb_list[sockfd]->bufMutex);
     }
   }
-  printf("Client sendBuf empty\n");
+  // printf("Client sendBuf empty\n");
   return NULL;
 }
 
@@ -441,7 +441,7 @@ void* sendBuf_timer(void* clienttcb)
 /// @return 当前时间，进度为秒
 unsigned int get_time_now()
 {
-  time_t now;
-  time(&now);
-  return (unsigned int)now;
+  struct timeval now;
+  gettimeofday(&now, NULL);
+  return now.tv_sec * 1000 + now.tv_usec / 1000;
 }
