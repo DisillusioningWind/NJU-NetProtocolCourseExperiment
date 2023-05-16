@@ -403,9 +403,7 @@ void *sendBuf_timer(void *clienttcb)
     pthread_mutex_unlock(tcb_list[sockfd]->bufMutex);
     unsigned int now = get_time_now();
     // 如果第一个已发送但未被确认段的发送时间超过DATA_TIMEOUT时间，则重传所有已发送但未被确认段
-    printf("now: %d, sentTime: %d\n", now, segBuf->sentTime);
-    printf("now - sentTime: %d\n", now - segBuf->sentTime);
-    if (now - segBuf->sentTime > DATA_TIMEOUT / 1000000000)
+    if (now - segBuf->sentTime > DATA_TIMEOUT / 10000)
     {
       pthread_mutex_lock(tcb_list[sockfd]->bufMutex);
       segBuf = tcb_list[sockfd]->sendBufHead;
@@ -428,10 +426,10 @@ void *sendBuf_timer(void *clienttcb)
 }
 
 /// @brief 获取当前时间
-/// @return 当前时间，进度为秒
+/// @return 当前时间，精度为毫秒
 unsigned int get_time_now()
 {
-  time_t now;
-  time(&now);
-  return (unsigned int)now;
+  struct timeval now;
+  gettimeofday(&now, NULL);
+  return now.tv_sec * 1000 + now.tv_usec / 1000;
 }
