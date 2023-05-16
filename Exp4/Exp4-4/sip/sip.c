@@ -27,7 +27,7 @@
 #include "routingtable.h"
 
 //SIP层等待这段时间让SIP路由协议建立路由路径. 
-#define SIP_WAITTIME 60
+#define SIP_WAITTIME 40
 
 /**************************************************************/
 //声明全局变量
