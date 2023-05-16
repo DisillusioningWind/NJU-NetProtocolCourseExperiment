@@ -265,7 +265,7 @@ reaccept:
 		if (res == -1)
 		{
 			// 如果SIP进程关闭了连接, 重新等待SIP进程的连接
-			printf("sip closed\n");
+			printf("SIP closed, wait for reconnecting\n");
 			close(sip_conn);
 			sip_conn = -1;
 			goto reaccept;

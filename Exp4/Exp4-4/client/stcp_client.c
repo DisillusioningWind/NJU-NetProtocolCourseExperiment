@@ -123,8 +123,8 @@ int stcp_client_connect(int sockfd, int nodeID, unsigned int server_port)
 /// @retval -1 发送失败
 int stcp_client_send(int sockfd, void *data, unsigned int length)
 {
-  printf("Client send data in\n");
-  printf("Client send length: %d\n", length);
+  // printf("Client send data in\n");
+  // printf("Client send length: %d\n", length);
   // 将数据分段
   int segCnt = length / MAX_SEG_LEN + (length % MAX_SEG_LEN != 0 ? 1 : 0);
   int remainLen = length;
@@ -165,7 +165,7 @@ int stcp_client_send(int sockfd, void *data, unsigned int length)
     tcb_list[sockfd]->next_seqNum += segLen;
   }
   // 从发送缓冲区中第一个未发送段开始发送，直到已发送但未被确认数据段的数目到达GBN_WINDOW
-  printf("unAck_segNum: %d\n", tcb_list[sockfd]->unAck_segNum);
+  // printf("unAck_segNum: %d\n", tcb_list[sockfd]->unAck_segNum);
   struct timeval tv, rtv;
   tv.tv_sec = 0;
   tv.tv_usec = 1000; // 1us = 1000ns
@@ -180,13 +180,13 @@ int stcp_client_send(int sockfd, void *data, unsigned int length)
       {
         // 缓冲区中STCP段已全部发送
         pthread_mutex_unlock(tcb_list[sockfd]->bufMutex);
-        printf("Client send data out\n");
+        // printf("Client send data out\n");
         return 1;
       }
       tcb_list[sockfd]->sendBufunSent->sentTime = get_time_now();
       seg_t seg = tcb_list[sockfd]->sendBufunSent->seg;
       pthread_mutex_unlock(tcb_list[sockfd]->bufMutex);
-      printf("seq_num: %d\n", seg.header.seq_num);
+      printf("send seq_num: %d\n", seg.header.seq_num);
       if (sip_sendseg(sip_conn, tcb_list[sockfd]->server_nodeID, &seg) < 0)
       {
         printf("stcp_client_send: sip_sendseg error\n");
@@ -197,7 +197,7 @@ int stcp_client_send(int sockfd, void *data, unsigned int length)
       tcb_list[sockfd]->unAck_segNum++;
     }
   }
-  printf("Client send data out\n");
+  // printf("Client send data out\n");
   return 1;
 }
 
@@ -284,16 +284,16 @@ int stcp_client_close(int sockfd)
 void *seghandler(void *arg)
 {
   fd_set rset, set;
-  struct timeval rtv, tv;
+  // struct timeval rtv, tv;
   int res;
   FD_ZERO(&set);
   FD_SET(sip_conn, &set);
-  rtv.tv_sec = 0;
-  rtv.tv_usec = SYN_TIMEOUT / 1000; // 1us = 1000ns
+  // rtv.tv_sec = 0;
+  // rtv.tv_usec = SYN_TIMEOUT / 1000; // 1us = 1000ns
 
   while (1)
   {
-    tv = rtv;
+    // tv = rtv;
     rset = set;
     res = select(sip_conn + 1, &rset, NULL, NULL, NULL);
     if (res < 0)
@@ -354,7 +354,7 @@ void *seghandler(void *arg)
           segBuf_t *segBuf = tcb_list[sockfd]->sendBufHead;
           while (segBuf != NULL && segBuf->seg.header.seq_num < seg.header.seq_num)
           {
-            printf("seq_num: %d, recv_seq_num: %d\n", segBuf->seg.header.seq_num, seg.header.seq_num);
+            printf("assumed seq_num: %d, recv seq_num: %d\n", segBuf->seg.header.seq_num, seg.header.seq_num);
             segBuf_t *tmp = segBuf;
             segBuf = segBuf->next;
             free(tmp);
@@ -403,6 +403,8 @@ void *sendBuf_timer(void *clienttcb)
     pthread_mutex_unlock(tcb_list[sockfd]->bufMutex);
     unsigned int now = get_time_now();
     // 如果第一个已发送但未被确认段的发送时间超过DATA_TIMEOUT时间，则重传所有已发送但未被确认段
+    printf("now: %d, sentTime: %d\n", now, segBuf->sentTime);
+    printf("now - sentTime: %d\n", now - segBuf->sentTime);
     if (now - segBuf->sentTime > DATA_TIMEOUT / 1000000000)
     {
       pthread_mutex_lock(tcb_list[sockfd]->bufMutex);
@@ -421,7 +423,7 @@ void *sendBuf_timer(void *clienttcb)
       pthread_mutex_unlock(tcb_list[sockfd]->bufMutex);
     }
   }
-  printf("Client sendBuf empty\n");
+  // printf("Client sendBuf empty\n");
   return NULL;
 }
 

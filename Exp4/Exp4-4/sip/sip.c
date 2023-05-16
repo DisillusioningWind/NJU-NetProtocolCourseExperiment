@@ -269,9 +269,9 @@ reaccept:
 		res = getsegToSend(stcp_conn, &destNodeID, &seg);
 		if (res == -1)
 		{
-			perror("getsegToSend");
 			close(stcp_conn);
 			stcp_conn = -1;
+			printf("STCP closed, wait for reconnecting\n");
 			goto reaccept;
 		}
 		// 封装数据报
