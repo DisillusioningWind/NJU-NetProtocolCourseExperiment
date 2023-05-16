@@ -189,6 +189,35 @@ void *listen_to_neighbor(void *arg)
 			close(connfd);
 			nt[idx].conn = -1;
 			printf("close conn to node %d\n", nt[idx].nodeID);
+			// 发送该节点不可达的sip报文
+			pkt.header.type = CLOSE;
+			pkt.header.src_nodeID = nt[idx].nodeID;
+			pkt.header.dest_nodeID = BROADCAST_NODEID;
+			pkt.header.length = 0;
+			if (sip_conn != -1)
+			{
+				// 将报文转发给SIP进程
+				res = forwardpktToSIP(&pkt, sip_conn);
+				if (res == -1)
+				{
+					perror("forwardpktToSIP");
+					return NULL;
+				}
+			}
+			else
+			{
+				for (int i = 0; i < nbrSumNum; i++)
+				{
+					if (nt[i].conn == -1)
+						continue;
+					int res = sendpkt(&pkt, nt[i].conn);
+					if (res == -1)
+					{
+						perror("sendpkt");
+						return NULL;
+					}
+				}
+			}
 			return NULL;
 		}
 		if (sip_conn != -1)
@@ -199,6 +228,21 @@ void *listen_to_neighbor(void *arg)
 			{
 				perror("forwardpktToSIP");
 				return NULL;
+			}
+		}
+		else
+		{
+			// 发送该节点不可达的sip报文
+			sip_pkt_t pkt;
+			pkt.header.type = CLOSE;
+			pkt.header.src_nodeID = myID;
+			pkt.header.dest_nodeID = BROADCAST_NODEID;
+			pkt.header.length = 0;
+			for (int i = 0; i < nbrSumNum; i++)
+			{
+				if (nt[i].conn == -1)
+					continue;
+				int res = sendpkt(&pkt, nt[i].conn);
 			}
 		}
 	}
@@ -260,6 +304,18 @@ reaccept:
 			printf("SIP closed, wait for reconnecting\n");
 			close(sip_conn);
 			sip_conn = -1;
+			// 发送该节点不可达的sip报文
+			sip_pkt_t pkt;
+			pkt.header.type = CLOSE;
+			pkt.header.src_nodeID = myID;
+			pkt.header.dest_nodeID = BROADCAST_NODEID;
+			pkt.header.length = 0;
+			for (int i = 0; i < nbrSumNum; i++)
+			{
+				if (nt[i].conn == -1)
+					continue;
+				int res = sendpkt(&pkt, nt[i].conn);
+			}
 			goto reaccept;
 		}
 		// 如果下一跳的节点ID为BROADCAST_NODEID, 报文应发送到所有邻居节点
