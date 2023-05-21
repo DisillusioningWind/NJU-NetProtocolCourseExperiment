@@ -178,6 +178,7 @@ void* pkthandler(void* arg) {
 						for(int j = 0; j < sumNum; j++)
 						{
 							dv[i].dvEntry[j].cost = INFINITE_COST;
+							dvtable_setcost(dv, dv[i].dvEntry[j].nodeID, srcID, INFINITE_COST);
 						}
 					}
 					else
@@ -200,6 +201,7 @@ void* pkthandler(void* arg) {
 						// D(destID) = min{c(selfID, interID) + D(interID, destID)}
 						int interID = nct[j].nodeID;
 						int tmpCost = nbrcosttable_getcost(nct, interID) + dvtable_getcost(dv, interID, destID);
+						printf("tmpCost = %d, minCost = %d, interID = %d, destID = %d\n", tmpCost, minCost, interID, destID);
 						if (tmpCost < minCost)
 						{
 							minCost = tmpCost;
@@ -236,19 +238,11 @@ void* pkthandler(void* arg) {
 //它关闭所有连接, 释放所有动态分配的内存.
 void sip_stop() {
 	sip_pkt_t pkt;
+	pkt.header.type = CLOSE;
 	pkt.header.src_nodeID = myID;
 	pkt.header.dest_nodeID = BROADCAST_NODEID;
-	pkt.header.type = ROUTE_UPDATE;
-	//更新自己的距离矢量
-	pthread_mutex_lock(dv_mutex);
-	for(int i = 0; i < sumNum; i++)
-	{
-		dv[nbrNum].dvEntry[i].cost = INFINITE_COST;
-	}
+	pkt.header.length = 0;
 	//发送路由更新报文
-	memcpy(pkt.data, dv[nbrNum].dvEntry, sizeof(dv_entry_t) * sumNum);
-	pthread_mutex_unlock(dv_mutex);
-	pkt.header.length = sizeof(dv_entry_t) * sumNum;
 	int res = son_sendpkt(BROADCAST_NODEID, &pkt, son_conn);
 	printf("sip send close packet\n");
 	if(res == -1)
