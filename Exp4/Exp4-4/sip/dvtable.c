@@ -112,7 +112,7 @@ void dvtable_print(dv_t* dvtable)
     printf("Node %d:\n", dvtable[i].nodeID);
     for (int j = 0; j < sumNum; j++)
     {
-      printf("  Node %d, Cost: %d\n", dvtable[i].dvEntry[j].nodeID, dvtable[i].dvEntry[j].cost);
+      printf("  Node %d, Cost: %d\n", dvtable[i].dvEntry[j].nodeID, dvtable[i].dvEntry[j].cost == -1 ? INFINITE_COST : dvtable[i].dvEntry[j].cost);
     }
   }
   return;

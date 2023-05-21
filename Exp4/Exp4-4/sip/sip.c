@@ -234,7 +234,7 @@ void* pkthandler(void* arg) {
 				routingtable_setnextnode(routingtable, destID, minID);
 			}
 			//打印距离矢量表和路由表
-			if(1)
+			if(isChange == 1)
 			{
 				dvtable_print(dv);
 				pthread_mutex_lock(routingtable_mutex);
@@ -401,6 +401,7 @@ int main(int argc, char *argv[]) {
 	printf("SIP layer is started...\n");
 	printf("waiting for routes to be established\n");
 	sleep(SIP_WAITTIME);
+	dvtable_print(dv);
 	routingtable_print(routingtable);
 
 	//等待来自STCP进程的连接
