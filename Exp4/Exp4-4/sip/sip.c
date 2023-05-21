@@ -192,16 +192,24 @@ void* pkthandler(void* arg) {
 				int destID = dv[nbrNum].dvEntry[i].nodeID;
 				int minCost = INFINITE_COST;
 				int minID = -1;
-				for(int j = 0; j < nbrNum; j++)
+				if(destID != myID)
 				{
-					//D(destID) = min{c(selfID, interID) + D(interID, destID)}
-					int interID = nct[j].nodeID;
-					int tmpCost = nbrcosttable_getcost(nct, interID) + dvtable_getcost(dv, interID, destID);
-					if(tmpCost < minCost)
+					for (int j = 0; j < nbrNum; j++)
 					{
-						minCost = tmpCost;
-						minID = interID;
+						// D(destID) = min{c(selfID, interID) + D(interID, destID)}
+						int interID = nct[j].nodeID;
+						int tmpCost = nbrcosttable_getcost(nct, interID) + dvtable_getcost(dv, interID, destID);
+						if (tmpCost < minCost)
+						{
+							minCost = tmpCost;
+							minID = interID;
+						}
 					}
+				}
+				else
+				{
+					minCost = 0;
+					minID = myID;
 				}
 				//更新路由表
 				if(minCost != dv[nbrNum].dvEntry[i].cost)
@@ -357,6 +365,7 @@ int main(int argc, char *argv[]) {
 
 	//注册用于终止进程的信号句柄
 	signal(SIGINT, sip_stop);
+	signal(SIGTERM, sip_stop);
 
 	//连接到本地SON进程 
 	son_conn = connectToSON();
