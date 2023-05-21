@@ -177,13 +177,17 @@ void* pkthandler(void* arg) {
 					{
 						for(int j = 0; j < sumNum; j++)
 						{
-							dv[i].dvEntry[j].cost = INFINITE_COST;
-							dvtable_setcost(dv, dv[i].dvEntry[j].nodeID, srcID, INFINITE_COST);
+							dv[i].dvEntry[j].cost = -1;
+							dvtable_setcost(dv, dv[i].dvEntry[j].nodeID, dv[i].nodeID, -1);
 						}
 					}
 					else
 					{
-					    memcpy(dv[i].dvEntry, pkt.data, sizeof(dv_entry_t) * sumNum);
+					    for(int j = 0; j < sumNum; j++)
+					    {
+							if(dv[i].dvEntry[j].cost != -1)
+							    dv[i].dvEntry[j].cost = ((dv_entry_t*)pkt.data)[j].cost;
+					    }
 					}
 					break;
 				}
@@ -194,14 +198,18 @@ void* pkthandler(void* arg) {
 				int destID = dv[nbrNum].dvEntry[i].nodeID;
 				int minCost = INFINITE_COST;
 				int minID = -1;
-				if(destID != myID)
+				if(destID != myID && dv[nbrNum].dvEntry[i].cost != -1)
 				{
 					for (int j = 0; j < nbrNum; j++)
 					{
 						// D(destID) = min{c(selfID, interID) + D(interID, destID)}
 						int interID = nct[j].nodeID;
-						int tmpCost = nbrcosttable_getcost(nct, interID) + dvtable_getcost(dv, interID, destID);
-						printf("tmpCost = %d, minCost = %d, interID = %d, destID = %d\n", tmpCost, minCost, interID, destID);
+						int nbrCost = nbrcosttable_getcost(nct, interID);
+						int dvCost = dvtable_getcost(dv, interID, destID);
+						if(dvCost == -1)
+							continue;
+						int tmpCost = nbrCost + dvCost;
+						// printf("tmpCost = %d, minCost = %d, interID = %d, destID = %d\n", tmpCost, minCost, interID, destID);
 						if (tmpCost < minCost)
 						{
 							minCost = tmpCost;
@@ -209,10 +217,15 @@ void* pkthandler(void* arg) {
 						}
 					}
 				}
-				else
+				else if(destID == myID)
 				{
 					minCost = 0;
 					minID = myID;
+				}
+				else
+				{
+					minCost = -1;
+					minID = -1;
 				}
 				//更新路由表
 				if(minCost != dv[nbrNum].dvEntry[i].cost)
@@ -221,7 +234,7 @@ void* pkthandler(void* arg) {
 				routingtable_setnextnode(routingtable, destID, minID);
 			}
 			//打印距离矢量表和路由表
-			if(isChange == 1)
+			if(1)
 			{
 				dvtable_print(dv);
 				pthread_mutex_lock(routingtable_mutex);
@@ -237,6 +250,7 @@ void* pkthandler(void* arg) {
 //这个函数终止SIP进程, 当SIP进程收到信号SIGINT时会调用这个函数. 
 //它关闭所有连接, 释放所有动态分配的内存.
 void sip_stop() {
+	pthread_mutex_lock(dv_mutex);
 	sip_pkt_t pkt;
 	pkt.header.type = CLOSE;
 	pkt.header.src_nodeID = myID;
@@ -249,6 +263,7 @@ void sip_stop() {
 	{
 		perror("son_sendpkt");
 	}
+	pthread_mutex_unlock(dv_mutex);
 	//关闭连接
 	if(son_conn > 0)
 		close(son_conn);
