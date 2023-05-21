@@ -77,23 +77,23 @@ int connectToSON() {
 //的距离矢量.广播是通过设置SIP报文头中的dest_nodeID为BROADCAST_NODEID,并通过son_sendpkt()发送报文来完成的.
 void* routeupdate_daemon(void* arg) {
 	int res;
-	sip_pkt_t pkt;
-	pkt.header.src_nodeID = myID;
-	pkt.header.dest_nodeID = BROADCAST_NODEID;
-	pkt.header.type = ROUTE_UPDATE;
-	pthread_mutex_lock(dv_mutex);
-	memcpy(pkt.data, dv[nbrNum].dvEntry, sizeof(dv_entry_t) * sumNum);
-	pthread_mutex_unlock(dv_mutex);
-	pkt.header.length = sizeof(dv_entry_t) * sumNum;
 	while (1)
 	{
+	    sip_pkt_t pkt;
+	    pkt.header.src_nodeID = myID;
+	    pkt.header.dest_nodeID = BROADCAST_NODEID;
+	    pkt.header.type = ROUTE_UPDATE;
+	    pthread_mutex_lock(dv_mutex);
+	    memcpy(pkt.data, dv[nbrNum].dvEntry, sizeof(dv_entry_t) * sumNum);
+	    pthread_mutex_unlock(dv_mutex);
+	    pkt.header.length = sizeof(dv_entry_t) * sumNum;
 		sleep(ROUTEUPDATE_INTERVAL);
 		if (son_conn > 0)
 		{
 			res = son_sendpkt(BROADCAST_NODEID, &pkt, son_conn);
 			if (res == -1)
 			{
-				perror("son_sendpkt");
+				perror("routeupdate_daemon:son_closed");
 				close(son_conn);
 				son_conn = -1;
 				return NULL;
@@ -117,7 +117,7 @@ void* pkthandler(void* arg) {
 		res = son_recvpkt(&pkt, son_conn);
 		if (res == -1)
 		{
-			perror("son_recvpkt");
+			printf("SON closed, stopping SIP\n");
 			close(son_conn);
 			son_conn = -1;
 			return NULL;
@@ -129,6 +129,7 @@ void* pkthandler(void* arg) {
 				if(stcp_conn < 0)
 				   continue;
 				// 转发给STCP
+				printf("forward SIP packet from node %d to STCP\n", pkt.header.src_nodeID);
 				memcpy(&seg, pkt.data, sizeof(seg_t));
 				res = forwardsegToSTCP(stcp_conn, pkt.header.src_nodeID, &seg);
 				if (res == -1)
@@ -217,6 +218,7 @@ void* pkthandler(void* arg) {
 				dv[nbrNum].dvEntry[i].cost = minCost;
 				routingtable_setnextnode(routingtable, destID, minID);
 			}
+			//打印距离矢量表和路由表
 			if(isChange == 1)
 			{
 				dvtable_print(dv);
@@ -334,6 +336,11 @@ reaccept:
 		pthread_mutex_lock(routingtable_mutex);
 		nextNodeID = routingtable_getnextnode(routingtable, destNodeID);
 		pthread_mutex_unlock(routingtable_mutex);
+		if(nextNodeID == -1)
+		{
+			printf("no route to node %d\n", destNodeID);
+			continue;
+		}
 		res = son_sendpkt(nextNodeID, &pkt, son_conn);
 		if (res == -1)
 		{
