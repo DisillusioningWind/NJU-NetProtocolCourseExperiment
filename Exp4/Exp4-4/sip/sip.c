@@ -150,7 +150,7 @@ void* pkthandler(void* arg) {
 					printf("no route to node %d\n", pkt.header.dest_nodeID);
 					continue;
 				}
-				printf("forward SIP packet for node %d to %d\n", pkt.header.dest_nodeID, next);
+				printf("forward SIP packet from node %d to %d\n", pkt.header.src_nodeID, next);
 				res = son_sendpkt(next, &pkt, son_conn);
 				if (res == -1)
 				{
@@ -203,13 +203,12 @@ void* pkthandler(void* arg) {
 					}
 				}
 				//更新路由表
-				if(minCost < dv[nbrNum].dvEntry[i].cost)
-				{
-					dv[nbrNum].dvEntry[i].cost = minCost;
-					pthread_mutex_lock(routingtable_mutex);
-					routingtable_setnextnode(routingtable, destID, minID);
-					pthread_mutex_unlock(routingtable_mutex);
-				}
+				dv[nbrNum].dvEntry[i].cost = minCost;
+				pthread_mutex_lock(routingtable_mutex);
+				routingtable_setnextnode(routingtable, destID, minID);
+				routingtable_print(routingtable);
+				pthread_mutex_unlock(routingtable_mutex);
+				dvtable_print(dv);
 			}
 			pthread_mutex_unlock(dv_mutex);
 		}
@@ -235,6 +234,7 @@ void sip_stop() {
 	pthread_mutex_unlock(dv_mutex);
 	pkt.header.length = sizeof(dv_entry_t) * sumNum;
 	int res = son_sendpkt(BROADCAST_NODEID, &pkt, son_conn);
+	printf("sip send close packet\n");
 	if(res == -1)
 	{
 		perror("son_sendpkt");

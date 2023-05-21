@@ -373,6 +373,7 @@ void son_stop()
 			continue;
 		int res = sendpkt(&pkt, nt[i].conn);
 	}
+	printf("son send close packet\n");
 	// 释放所有动态分配的内存
 	nt_destroy(nt);
 	// 关闭与SIP进程的连接

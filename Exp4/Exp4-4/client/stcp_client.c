@@ -1,6 +1,6 @@
-//ÎÄ¼şÃû: client/stcp_client.c
+//æ–‡ä»¶å: client/stcp_client.c
 //
-//ÃèÊö: Õâ¸öÎÄ¼ş°üº¬STCP¿Í»§¶Ë½Ó¿ÚÊµÏÖ 
+//æè¿°: è¿™ä¸ªæ–‡ä»¶åŒ…å«STCPå®¢æˆ·ç«¯æ¥å£å®ç° 
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -18,13 +18,13 @@
 #include "stcp_client.h"
 #include "../common/seg.h"
 
-int sip_conn;										  // ÖØµşÍøÂç²ãTCPÌ×½Ó×ÖÃèÊö·û
-client_tcb_t *tcb_list[MAX_TRANSPORT_CONNECTIONS];	  // ¿Í»§¶ËTCB±í
-pthread_mutex_t st_mutex = PTHREAD_MUTEX_INITIALIZER; // TCB±í»¥³âËø
-pthread_cond_t st_cond = PTHREAD_COND_INITIALIZER;	  // TCB±íÌõ¼ş±äÁ¿
+int sip_conn;										  // é‡å ç½‘ç»œå±‚TCPå¥—æ¥å­—æè¿°ç¬¦
+client_tcb_t *tcb_list[MAX_TRANSPORT_CONNECTIONS];	  // å®¢æˆ·ç«¯TCBè¡¨
+pthread_mutex_t st_mutex = PTHREAD_MUTEX_INITIALIZER; // TCBè¡¨äº’æ–¥é”
+pthread_cond_t st_cond = PTHREAD_COND_INITIALIZER;	  // TCBè¡¨æ¡ä»¶å˜é‡
 
-/// @brief ³õÊ¼»¯¿Í»§¶ËTCB±í
-/// @param conn ÖØµşÍøÂç²ãTCPÌ×½Ó×ÖÃèÊö·û
+/// @brief åˆå§‹åŒ–å®¢æˆ·ç«¯TCBè¡¨
+/// @param conn é‡å ç½‘ç»œå±‚TCPå¥—æ¥å­—æè¿°ç¬¦
 void stcp_client_init(int conn)
 {
   for (int i = 0; i < MAX_TRANSPORT_CONNECTIONS; i++)
@@ -34,10 +34,10 @@ void stcp_client_init(int conn)
   pthread_create(&thread, NULL, seghandler, NULL);
 }
 
-/// @brief ´´½¨STCP¿Í»§¶ËÌ×½Ó×Ö
-/// @param client_port ¿Í»§¶Ë¶Ë¿ÚºÅ
-/// @retval >=0 ´´½¨³É¹¦£¬·µ»ØTCB±íÖĞµÄÌõÄ¿Ë÷Òı
-/// @retval -1 ´´½¨Ê§°Ü
+/// @brief åˆ›å»ºSTCPå®¢æˆ·ç«¯å¥—æ¥å­—
+/// @param client_port å®¢æˆ·ç«¯ç«¯å£å·
+/// @retval >=0 åˆ›å»ºæˆåŠŸï¼Œè¿”å›TCBè¡¨ä¸­çš„æ¡ç›®ç´¢å¼•
+/// @retval -1 åˆ›å»ºå¤±è´¥
 int stcp_client_sock(unsigned int client_port)
 {
   for (int i = 0; i < MAX_TRANSPORT_CONNECTIONS; i++)
@@ -62,11 +62,11 @@ int stcp_client_sock(unsigned int client_port)
   return -1;
 }
 
-/// @brief Á¬½ÓSTCP·şÎñÆ÷
-/// @param sockfd Ì×½Ó×ÖID
-/// @param server_port ·şÎñÆ÷¶Ë¿ÚºÅ
-/// @retval 1 Á¬½Ó³É¹¦
-/// @retval -1 Á¬½ÓÊ§°Ü
+/// @brief è¿æ¥STCPæœåŠ¡å™¨
+/// @param sockfd å¥—æ¥å­—ID
+/// @param server_port æœåŠ¡å™¨ç«¯å£å·
+/// @retval 1 è¿æ¥æˆåŠŸ
+/// @retval -1 è¿æ¥å¤±è´¥
 int stcp_client_connect(int sockfd, int nodeID, unsigned int server_port) 
 {
   tcb_list[sockfd]->server_nodeID = nodeID;
@@ -115,17 +115,17 @@ int stcp_client_connect(int sockfd, int nodeID, unsigned int server_port)
   return -1;
 }
 
-/// @brief ÏòSTCP·şÎñÆ÷·¢ËÍÊı¾İ
-/// @param sockfd Ì×½Ó×ÖID
-/// @param data ·¢ËÍÊı¾İ»º³åÇø
-/// @param length ·¢ËÍÊı¾İ³¤¶È
-/// @retval 1 ·¢ËÍ³É¹¦
-/// @retval -1 ·¢ËÍÊ§°Ü
+/// @brief å‘STCPæœåŠ¡å™¨å‘é€æ•°æ®
+/// @param sockfd å¥—æ¥å­—ID
+/// @param data å‘é€æ•°æ®ç¼“å†²åŒº
+/// @param length å‘é€æ•°æ®é•¿åº¦
+/// @retval 1 å‘é€æˆåŠŸ
+/// @retval -1 å‘é€å¤±è´¥
 int stcp_client_send(int sockfd, void *data, unsigned int length)
 {
   // printf("Client send data in\n");
   // printf("Client send length: %d\n", length);
-  // ½«Êı¾İ·Ö¶Î
+  // å°†æ•°æ®åˆ†æ®µ
   int segCnt = length / MAX_SEG_LEN + (length % MAX_SEG_LEN != 0 ? 1 : 0);
   int remainLen = length;
   for (int i = 0; i < segCnt; i++)
@@ -145,11 +145,11 @@ int stcp_client_send(int sockfd, void *data, unsigned int length)
     pthread_mutex_lock(tcb_list[sockfd]->bufMutex);
     if (tcb_list[sockfd]->sendBufHead == NULL)
     {
-      // »º³åÇøÎª¿Õ
+      // ç¼“å†²åŒºä¸ºç©º
       tcb_list[sockfd]->sendBufHead = segBuf;
       tcb_list[sockfd]->sendBufunSent = segBuf;
       tcb_list[sockfd]->sendBufTail = segBuf;
-      // Æô¶¯sendBuf_timerÏß³Ì
+      // å¯åŠ¨sendBuf_timerçº¿ç¨‹
       pthread_t thread;
       pthread_create(&thread, NULL, sendBuf_timer, (void *)sockfd);
     }
@@ -157,14 +157,14 @@ int stcp_client_send(int sockfd, void *data, unsigned int length)
     {
       tcb_list[sockfd]->sendBufTail->next = segBuf;
       tcb_list[sockfd]->sendBufTail = segBuf;
-      // »º³åÇøÖĞSTCP¶ÎÒÑÈ«²¿·¢ËÍ
+      // ç¼“å†²åŒºä¸­STCPæ®µå·²å…¨éƒ¨å‘é€
       if (tcb_list[sockfd]->sendBufunSent == NULL)
         tcb_list[sockfd]->sendBufunSent = segBuf;
     }
     pthread_mutex_unlock(tcb_list[sockfd]->bufMutex);
     tcb_list[sockfd]->next_seqNum += segLen;
   }
-  // ´Ó·¢ËÍ»º³åÇøÖĞµÚÒ»¸öÎ´·¢ËÍ¶Î¿ªÊ¼·¢ËÍ£¬Ö±µ½ÒÑ·¢ËÍµ«Î´±»È·ÈÏÊı¾İ¶ÎµÄÊıÄ¿µ½´ïGBN_WINDOW
+  // ä»å‘é€ç¼“å†²åŒºä¸­ç¬¬ä¸€ä¸ªæœªå‘é€æ®µå¼€å§‹å‘é€ï¼Œç›´åˆ°å·²å‘é€ä½†æœªè¢«ç¡®è®¤æ•°æ®æ®µçš„æ•°ç›®åˆ°è¾¾GBN_WINDOW
   // printf("unAck_segNum: %d\n", tcb_list[sockfd]->unAck_segNum);
   struct timeval tv, rtv;
   tv.tv_sec = 0;
@@ -178,7 +178,7 @@ int stcp_client_send(int sockfd, void *data, unsigned int length)
       pthread_mutex_lock(tcb_list[sockfd]->bufMutex);
       if (tcb_list[sockfd]->sendBufunSent == NULL)
       {
-        // »º³åÇøÖĞSTCP¶ÎÒÑÈ«²¿·¢ËÍ
+        // ç¼“å†²åŒºä¸­STCPæ®µå·²å…¨éƒ¨å‘é€
         pthread_mutex_unlock(tcb_list[sockfd]->bufMutex);
         // printf("Client send data out\n");
         return 1;
@@ -201,10 +201,10 @@ int stcp_client_send(int sockfd, void *data, unsigned int length)
   return 1;
 }
 
-/// @brief ¹Ø±ÕSTCPÁ¬½Ó.
-/// @param sockfd Ì×½Ó×ÖID
-/// @retval 1 ¹Ø±Õ³É¹¦
-/// @retval -1 ¹Ø±ÕÊ§°Ü
+/// @brief å…³é—­STCPè¿æ¥.
+/// @param sockfd å¥—æ¥å­—ID
+/// @retval 1 å…³é—­æˆåŠŸ
+/// @retval -1 å…³é—­å¤±è´¥
 int stcp_client_disconnect(int sockfd)
 {
   seg_t seg;
@@ -255,10 +255,10 @@ int stcp_client_disconnect(int sockfd)
   return -1;
 }
 
-/// @brief ¹Ø±ÕSTCP¿Í»§¶Ë
-/// @param sockfd Ì×½Ó×ÖID
-/// @retval 1 ¹Ø±Õ³É¹¦
-/// @retval -1 ¹Ø±ÕÊ§°Ü
+/// @brief å…³é—­STCPå®¢æˆ·ç«¯
+/// @param sockfd å¥—æ¥å­—ID
+/// @retval 1 å…³é—­æˆåŠŸ
+/// @retval -1 å…³é—­å¤±è´¥
 int stcp_client_close(int sockfd)
 {
   if (tcb_list[sockfd]->state == CLOSED)
@@ -280,7 +280,7 @@ int stcp_client_close(int sockfd)
   return -1;
 }
 
-/// @brief ´¦Àí½ÓÊÕµ½µÄSTCP¶Î
+/// @brief å¤„ç†æ¥æ”¶åˆ°çš„STCPæ®µ
 void *seghandler(void *arg)
 {
   fd_set rset, set;
@@ -317,7 +317,7 @@ void *seghandler(void *arg)
       }
       else if (res == 1)
       {
-        // Ä£Äâ¶ª°ü
+        // æ¨¡æ‹Ÿä¸¢åŒ…
         continue;
       }
       int sockfd = -1;
@@ -378,8 +378,8 @@ void *seghandler(void *arg)
   return 0;
 }
 
-/// @brief ·¢ËÍ»º³åÇø¶¨Ê±Æ÷
-/// @param clienttcb ¿Í»§¶ËÌ×½Ó×ÖID
+/// @brief å‘é€ç¼“å†²åŒºå®šæ—¶å™¨
+/// @param clienttcb å®¢æˆ·ç«¯å¥—æ¥å­—ID
 void *sendBuf_timer(void *clienttcb)
 {
   int sockfd = (int)clienttcb;
@@ -391,7 +391,7 @@ void *sendBuf_timer(void *clienttcb)
   {
     rtv = tv;
     select(0, NULL, NULL, NULL, &rtv);
-    // Ã¿¸ôSENDBUF_POLLING_INTERVALÊ±¼ä¾Í²éÑ¯µÚÒ»¸öÒÑ·¢ËÍµ«Î´±»È·ÈÏ¶Î
+    // æ¯éš”SENDBUF_POLLING_INTERVALæ—¶é—´å°±æŸ¥è¯¢ç¬¬ä¸€ä¸ªå·²å‘é€ä½†æœªè¢«ç¡®è®¤æ®µ
     pthread_mutex_lock(tcb_list[sockfd]->bufMutex);
     segBuf_t *segBuf = tcb_list[sockfd]->sendBufHead;
     if (segBuf == NULL)
@@ -399,10 +399,10 @@ void *sendBuf_timer(void *clienttcb)
       pthread_mutex_unlock(tcb_list[sockfd]->bufMutex);
       break;
     }
-    // »º³åÇø·Ç¿Õ
+    // ç¼“å†²åŒºéç©º
     pthread_mutex_unlock(tcb_list[sockfd]->bufMutex);
     unsigned int now = get_time_now();
-    // Èç¹ûµÚÒ»¸öÒÑ·¢ËÍµ«Î´±»È·ÈÏ¶ÎµÄ·¢ËÍÊ±¼ä³¬¹ıDATA_TIMEOUTÊ±¼ä£¬ÔòÖØ´«ËùÓĞÒÑ·¢ËÍµ«Î´±»È·ÈÏ¶Î
+    // å¦‚æœç¬¬ä¸€ä¸ªå·²å‘é€ä½†æœªè¢«ç¡®è®¤æ®µçš„å‘é€æ—¶é—´è¶…è¿‡DATA_TIMEOUTæ—¶é—´ï¼Œåˆ™é‡ä¼ æ‰€æœ‰å·²å‘é€ä½†æœªè¢«ç¡®è®¤æ®µ
     if (now - segBuf->sentTime > DATA_TIMEOUT / 10000)
     {
       pthread_mutex_lock(tcb_list[sockfd]->bufMutex);
@@ -425,8 +425,8 @@ void *sendBuf_timer(void *clienttcb)
   return NULL;
 }
 
-/// @brief »ñÈ¡µ±Ç°Ê±¼ä
-/// @return µ±Ç°Ê±¼ä£¬¾«¶ÈÎªºÁÃë
+/// @brief è·å–å½“å‰æ—¶é—´
+/// @return å½“å‰æ—¶é—´ï¼Œç²¾åº¦ä¸ºæ¯«ç§’
 unsigned int get_time_now()
 {
   struct timeval now;
