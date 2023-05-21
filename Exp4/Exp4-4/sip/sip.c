@@ -165,6 +165,7 @@ void* pkthandler(void* arg) {
 		{
 			int i;
 			int srcID = pkt.header.src_nodeID;
+			int isChange = 0;
 			pthread_mutex_lock(dv_mutex);
 			//更新来源节点的距离矢量
 			for (i = 0; i < nbrNum + 1; i++)
@@ -203,12 +204,17 @@ void* pkthandler(void* arg) {
 					}
 				}
 				//更新路由表
+				if(minCost != dv[nbrNum].dvEntry[i].cost)
+					isChange = 1;
 				dv[nbrNum].dvEntry[i].cost = minCost;
-				pthread_mutex_lock(routingtable_mutex);
 				routingtable_setnextnode(routingtable, destID, minID);
+			}
+			if(isChange == 1)
+			{
+				dvtable_print(dv);
+				pthread_mutex_lock(routingtable_mutex);
 				routingtable_print(routingtable);
 				pthread_mutex_unlock(routingtable_mutex);
-				dvtable_print(dv);
 			}
 			pthread_mutex_unlock(dv_mutex);
 		}

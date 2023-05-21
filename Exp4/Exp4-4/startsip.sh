@@ -1,0 +1,2 @@
+./sip/sip&
+echo $! > SIPPID
