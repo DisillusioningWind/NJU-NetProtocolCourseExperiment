@@ -116,14 +116,19 @@ void* pkthandler(void* arg) {
 	seg_t seg;
 	while (1)
 	{
+		if(son_conn == -1)
+		    continue;
 		res = son_recvpkt(&pkt, son_conn);
 		if (res == -1)
 		{
 			perror("handle1:son_recvpkt");
 			// printf("SON closed, stopping SIP\n");
-			close(son_conn);
-			son_conn = -1;
-			exit(1);
+			// if(son_conn != -1)
+			// {
+			//     close(son_conn);
+			//     son_conn = -1;
+			// }
+			continue;
 		}
 		if (pkt.header.type == SIP)
 		{
