@@ -33,7 +33,8 @@
 //声明全局变量
 /**************************************************************/
 int son_conn; 			//到重叠网络的连接
-int stcp_conn;			//到STCP的连接
+int sip_socket;			//连接STCP程序的SIP服务器套接字
+int stcp_conn;			//STCP监听套接字
 nbr_cost_entry_t* nct;			//邻居代价表
 dv_t* dv;				//距离矢量表
 pthread_mutex_t* dv_mutex;		//距离矢量表互斥量
@@ -79,6 +80,7 @@ void* routeupdate_daemon(void* arg) {
 	int res, first = 1;
 	while (1)
 	{
+		sleep(ROUTEUPDATE_INTERVAL);
 	    sip_pkt_t pkt;
 	    pkt.header.src_nodeID = myID;
 	    pkt.header.dest_nodeID = BROADCAST_NODEID;
@@ -101,7 +103,6 @@ void* routeupdate_daemon(void* arg) {
 			son_conn = -1;
 			return NULL;
 		}
-		sleep(ROUTEUPDATE_INTERVAL);
 	}
 	return NULL;
 }
@@ -227,8 +228,6 @@ void* pkthandler(void* arg) {
 						int interID = nct[j].nodeID;
 						int nbrCost = interID == myID ? 0 : nbrcosttable_getcost(nct, interID);
 						int dvCost = interID == destID ? 0 : dvtable_getcost(dv, interID, destID);
-						if(dvCost == -1)
-							continue;
 						int tmpCost = nbrCost + dvCost;
 						// printf("tmpCost = %d, minCost = %d, interID = %d, destID = %d\n", tmpCost, minCost, interID, destID);
 						if (tmpCost < minCost)
@@ -280,6 +279,8 @@ void sip_stop() {
 		close(son_conn);
 	if(stcp_conn > 0)
 		close(stcp_conn);
+	if(sip_socket > 0)
+		close(sip_socket);
 	nbrcosttable_destroy(nct);
 	dvtable_destroy(dv);
 	routingtable_destroy(routingtable);
@@ -293,31 +294,31 @@ void sip_stop() {
 //接收的段被封装进数据报(一个段在一个数据报中), 然后使用son_sendpkt发送该报文到下一跳. 下一跳节点ID提取自路由表.
 //当本地STCP进程断开连接时, 这个函数等待下一个STCP进程的连接.
 void waitSTCP() {
-	int sockfd, res;
+	int res;
 	struct sockaddr_in my_addr;
 	// 创建TCP套接字
-	sockfd = socket(AF_INET, SOCK_STREAM, 0);
-	if (sockfd < 0)
+	sip_socket = socket(AF_INET, SOCK_STREAM, 0);
+	if (sip_socket < 0)
 	{
 		perror("socket");
 		exit(1);
 	}
 	// 设置端口复用
 	int opt = 1;
-	res = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+	res = setsockopt(sip_socket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 	// 设置本地地址结构
 	my_addr.sin_family = AF_INET;
 	my_addr.sin_port = htons(SIP_PORT);
 	my_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 	// 绑定TCP套接字到本地地址结构
-	res = bind(sockfd, (struct sockaddr *)&my_addr, sizeof(struct sockaddr));
+	res = bind(sip_socket, (struct sockaddr *)&my_addr, sizeof(struct sockaddr));
 	if (res == -1)
 	{
 		perror("bind");
 		exit(1);
 	}
 	// 监听TCP套接字
-	res = listen(sockfd, MAX_NODE_NUM);
+	res = listen(sip_socket, MAX_NODE_NUM);
 	if (res == -1)
 	{
 		perror("listen");
@@ -325,7 +326,7 @@ void waitSTCP() {
 	}
 reaccept:
 	// 接受来自SIP进程的连接
-	stcp_conn = accept(sockfd, NULL, NULL);
+	stcp_conn = accept(sip_socket, NULL, NULL);
 	if (stcp_conn == -1)
 	{
 		perror("accept");
