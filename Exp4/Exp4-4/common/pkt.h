@@ -10,6 +10,7 @@
 #define	ROUTE_UPDATE 1
 #define SIP 2	
 #define CLOSE 3
+#define CONNECT 4
 
 //SIP报文格式定义
 typedef struct sipheader {

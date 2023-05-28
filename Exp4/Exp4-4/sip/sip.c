@@ -76,31 +76,32 @@ int connectToSON() {
 //这个线程每隔ROUTEUPDATE_INTERVAL时间发送路由更新报文.路由更新报文包含这个节点
 //的距离矢量.广播是通过设置SIP报文头中的dest_nodeID为BROADCAST_NODEID,并通过son_sendpkt()发送报文来完成的.
 void* routeupdate_daemon(void* arg) {
-	int res;
+	int res, first = 1;
 	while (1)
 	{
 	    sip_pkt_t pkt;
 	    pkt.header.src_nodeID = myID;
 	    pkt.header.dest_nodeID = BROADCAST_NODEID;
-	    pkt.header.type = ROUTE_UPDATE;
+		if(first == 1)
+		{
+			first = 0;
+			pkt.header.type = CONNECT;
+		}
+		else
+	        pkt.header.type = ROUTE_UPDATE;
 	    pthread_mutex_lock(dv_mutex);
 	    memcpy(pkt.data, dv[nbrNum].dvEntry, sizeof(dv_entry_t) * sumNum);
 	    pthread_mutex_unlock(dv_mutex);
 	    pkt.header.length = sizeof(dv_entry_t) * sumNum;
-		sleep(ROUTEUPDATE_INTERVAL);
-		if (son_conn > 0)
+		res = son_sendpkt(BROADCAST_NODEID, &pkt, son_conn);
+		if (res == -1)
 		{
-			res = son_sendpkt(BROADCAST_NODEID, &pkt, son_conn);
-			if (res == -1)
-			{
-				perror("routeupdate_daemon:son_closed");
-				close(son_conn);
-				son_conn = -1;
-				return NULL;
-			}
-		}
-		else
+			perror("routeupdate_daemon:son_closed");
+			close(son_conn);
+			son_conn = -1;
 			return NULL;
+		}
+		sleep(ROUTEUPDATE_INTERVAL);
 	}
 	return NULL;
 }
@@ -162,7 +163,7 @@ void* pkthandler(void* arg) {
 				}
 			}
 		}
-		else if (pkt.header.type == ROUTE_UPDATE || pkt.header.type == CLOSE)
+		else //if (pkt.header.type == ROUTE_UPDATE || pkt.header.type == CLOSE || pkt.header.type == CONNECT)
 		{
 			int i;
 			int srcID = pkt.header.src_nodeID;
@@ -175,18 +176,25 @@ void* pkthandler(void* arg) {
 				{
 					if(pkt.header.type == CLOSE)
 					{
-						for(int j = 0; j < sumNum; j++)
+						nbrcosttable_setcost(nct, srcID, INFINITE_COST);
+						for (int j = 0; j < sumNum; j++)
 						{
-							dv[i].dvEntry[j].cost = -1;
-							dvtable_setcost(dv, dv[i].dvEntry[j].nodeID, dv[i].nodeID, -1);
+							dv[i].dvEntry[j].cost = INFINITE_COST;
+						}
+					}
+					else if(pkt.header.type == CONNECT)
+					{
+						nbrcosttable_setcost(nct, srcID, topology_getCost(myID, srcID));
+						for (int j = 0; j < sumNum; j++)
+						{
+							dv[i].dvEntry[j].cost = topology_getCost(dv[i].nodeID, dv[i].dvEntry[j].nodeID);
 						}
 					}
 					else
 					{
 					    for(int j = 0; j < sumNum; j++)
 					    {
-							if(dv[i].dvEntry[j].cost != -1)
-							    dv[i].dvEntry[j].cost = ((dv_entry_t*)pkt.data)[j].cost;
+							dv[i].dvEntry[j].cost = ((dv_entry_t*)pkt.data)[j].cost;
 					    }
 					}
 					break;
@@ -198,14 +206,27 @@ void* pkthandler(void* arg) {
 				int destID = dv[nbrNum].dvEntry[i].nodeID;
 				int minCost = INFINITE_COST;
 				int minID = -1;
-				if(destID != myID && dv[nbrNum].dvEntry[i].cost != -1)
+				//直连节点
+				int nbrCost = nbrcosttable_getcost(nct, destID);
+				if(destID == myID)
+				{
+					minCost = 0;
+					minID = myID;
+				}
+				else if(nbrCost == INFINITE_COST)
+				{
+					//链路断了
+					minCost = INFINITE_COST;
+					minID = -1;
+				}
+				else //if(dv[nbrNum].dvEntry[i].cost != -1)
 				{
 					for (int j = 0; j < nbrNum; j++)
 					{
 						// D(destID) = min{c(selfID, interID) + D(interID, destID)}
 						int interID = nct[j].nodeID;
-						int nbrCost = nbrcosttable_getcost(nct, interID);
-						int dvCost = dvtable_getcost(dv, interID, destID);
+						int nbrCost = interID == myID ? 0 : nbrcosttable_getcost(nct, interID);
+						int dvCost = interID == destID ? 0 : dvtable_getcost(dv, interID, destID);
 						if(dvCost == -1)
 							continue;
 						int tmpCost = nbrCost + dvCost;
@@ -216,16 +237,6 @@ void* pkthandler(void* arg) {
 							minID = interID;
 						}
 					}
-				}
-				else if(destID == myID)
-				{
-					minCost = 0;
-					minID = myID;
-				}
-				else
-				{
-					minCost = -1;
-					minID = -1;
 				}
 				//更新路由表
 				if(minCost != dv[nbrNum].dvEntry[i].cost)

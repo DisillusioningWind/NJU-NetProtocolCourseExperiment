@@ -72,7 +72,7 @@
 #define BROADCAST_NODEID 9999
 
 //路由更新广播间隔, 以秒为单位
-#define ROUTEUPDATE_INTERVAL 5
+#define ROUTEUPDATE_INTERVAL 3
 
 //tppology.dat文件的相对路径
 #define TOPOLOGY_FILE "./topology/topology.dat"

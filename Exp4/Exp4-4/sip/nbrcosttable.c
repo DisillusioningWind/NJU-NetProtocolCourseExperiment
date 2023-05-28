@@ -36,7 +36,7 @@ void nbrcosttable_destroy(nbr_cost_entry_t* nct)
 }
 
 //这个函数用于获取邻居的直接链路代价.
-//如果邻居节点在表中发现,就返回直接链路代价.否则返回INFINITE_COST.
+//如果邻居节点在表中发现,就返回直接链路代价.不是邻居返回-1
 unsigned int nbrcosttable_getcost(nbr_cost_entry_t* nct, int nodeID)
 {
   for (int i = 0; i < nbrNum; i++)
@@ -44,7 +44,20 @@ unsigned int nbrcosttable_getcost(nbr_cost_entry_t* nct, int nodeID)
     if (nct[i].nodeID == nodeID)
       return nct[i].cost;
   }
-  return INFINITE_COST;
+  return -1;
+}
+
+int nbrcosttable_setcost(nbr_cost_entry_t *nct, int nodeID, unsigned int cost)
+{
+  for (int i = 0; i < nbrNum; i++)
+  {
+    if (nct[i].nodeID == nodeID)
+    {
+      nct[i].cost = cost;
+      return 1;
+    }
+  }
+  return -1;
 }
 
 //这个函数打印邻居代价表的内容.
