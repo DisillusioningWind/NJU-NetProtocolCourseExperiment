@@ -196,7 +196,8 @@ void *listen_to_neighbor(void *arg)
 			if (res == -1)
 			{
 				perror("forwardpktToSIP");
-				return NULL;
+				printf("strange sip closed\n");
+				continue;
 			}
 		}
 	}
@@ -247,6 +248,7 @@ reaccept:
 		exit(1);
 	}
 	// 持续接收来自SIP进程的报文
+	printf("accept sip conn\n");
 	while (1)
 	{
 		sip_pkt_t arg;
@@ -255,6 +257,7 @@ reaccept:
 		if (res == -1)
 		{
 			// 如果SIP进程关闭了连接, 重新等待SIP进程的连接
+			perror("getpktToSend");
 			printf("SIP closed, wait for reconnecting\n");
 			close(sip_conn);
 			sip_conn = -1;
@@ -296,6 +299,7 @@ reaccept:
 			}
 		}
 	}
+	printf("strange sip closed in waitSIP\n");
 	return;
 }
 

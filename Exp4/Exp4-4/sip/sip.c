@@ -119,10 +119,11 @@ void* pkthandler(void* arg) {
 		res = son_recvpkt(&pkt, son_conn);
 		if (res == -1)
 		{
-			printf("SON closed, stopping SIP\n");
+			perror("handle1:son_recvpkt");
+			// printf("SON closed, stopping SIP\n");
 			close(son_conn);
 			son_conn = -1;
-			return NULL;
+			exit(1);
 		}
 		if (pkt.header.type == SIP)
 		{
@@ -136,10 +137,10 @@ void* pkthandler(void* arg) {
 				res = forwardsegToSTCP(stcp_conn, pkt.header.src_nodeID, &seg);
 				if (res == -1)
 				{
-					perror("stcp_conn_sendpkt");
-					close(stcp_conn);
-					stcp_conn = -1;
-					return NULL;
+				   perror("handle2:stcp_conn_sendpkt");
+				   close(stcp_conn);
+				   stcp_conn = -1;
+				   return NULL;
 				}
 			}
 			else
@@ -157,7 +158,7 @@ void* pkthandler(void* arg) {
 				res = son_sendpkt(next, &pkt, son_conn);
 				if (res == -1)
 				{
-					perror("son_sendpkt");
+					perror("handle3:son_sendpkt");
 					close(son_conn);
 					son_conn = -1;
 					return NULL;
