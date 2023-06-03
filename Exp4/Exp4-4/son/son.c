@@ -199,8 +199,8 @@ void *listen_to_neighbor(void *arg)
 				printf("strange sip closed\n");
 				continue;
 			}
-			// 如果该节点是136即展示节点且报文的类型是SIP报文，打印该报文被转发的节点即中间节点
-			if(myID == 136 && pkt.header.type == SIP)
+			// 如果该节点报文的类型是SIP报文，打印该报文被转发的节点即中间节点
+			if(pkt.header.type == SIP)
 			{
 				printf("SIP pkt src node:%d, transmitted by node:%d\n", pkt.header.src_nodeID, nt[idx].nodeID);
 			}
