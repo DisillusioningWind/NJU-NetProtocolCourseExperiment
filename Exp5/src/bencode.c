@@ -37,12 +37,14 @@ long long be_str_len(be_node *node)
 	return ret;
 }
 
-static char *_be_decode_str(const char **data, long long *data_len)
+static char *_be_decode_str(const char **data, long long *data_len, int *str_len)
 {
 	long long sllen = _be_decode_int(data, data_len);
 	long slen = sllen;
 	unsigned long len;
 	char *ret = NULL;
+
+	*str_len = (int)sllen;
 
 	if (sllen < 0)
 		return ret;
@@ -104,6 +106,7 @@ static be_node *_be_decode(const char **data, long long *data_len)
 		/* 字典 */
 		case 'd': {
 			unsigned int i = 0;
+			int slen;
 
 			ret = be_alloc(BE_DICT);
 
@@ -111,7 +114,7 @@ static be_node *_be_decode(const char **data, long long *data_len)
 			++(*data);
 			while (**data != 'e') {
 				ret->val.d = realloc(ret->val.d, (i + 2) * sizeof(*ret->val.d));
-				ret->val.d[i].key = _be_decode_str(data, data_len);
+				ret->val.d[i].key = _be_decode_str(data, data_len, &slen);
 				ret->val.d[i].val = _be_decode(data, data_len);
 				++i;
 			}
@@ -143,8 +146,7 @@ static be_node *_be_decode(const char **data, long long *data_len)
 		case '0'...'9': {
 			ret = be_alloc(BE_STR);
 
-			ret->val.s = _be_decode_str(data, data_len);
-			// ret->len = data_len;
+			ret->val.s = _be_decode_str(data, data_len, &ret->len);
 
 			return ret;
 		}

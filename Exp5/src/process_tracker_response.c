@@ -181,9 +181,9 @@ tracker_data* get_tracker_data(char* data, int len)
 void get_peers(tracker_data* td, be_node* peer_list)
 {
   int i;
-  int numpeers = strlen(peer_list->val.s) / 6;
+  int numpeers = peer_list->len / 6;
 
-  // printf("Num peers: %d\n",numpeers);
+  // printf("peer len: %d\n",peer_list->len);
 
   // 为peer分配空间
   td->numpeers = numpeers;
