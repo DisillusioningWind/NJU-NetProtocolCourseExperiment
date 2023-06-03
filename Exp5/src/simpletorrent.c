@@ -9,6 +9,7 @@
 #include "util.h"
 #include "btdata.h"
 #include "bencode.h"
+#include "pwp.h"
 
 //#define MAXLINE 4096 
 // pthread数据
@@ -92,6 +93,8 @@ int main(int argc, char **argv)
   signal(SIGINT,client_shutdown);
 
   // 设置监听peer的线程
+  pthread_t listen_thread;
+  pthread_create(&listen_thread, NULL, pwp_thread, NULL);
 
   // 定期联系Tracker服务器
   int firsttime = 1;
@@ -140,7 +143,7 @@ int main(int argc, char **argv)
 
     printf("Parsing tracker data\n");
     g_tracker_response = get_tracker_data(tmp2,tr->size);
-    
+
     if(tmp)
     {
       free(tmp2);

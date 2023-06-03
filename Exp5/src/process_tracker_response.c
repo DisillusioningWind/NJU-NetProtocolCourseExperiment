@@ -28,23 +28,40 @@ tracker_response* preprocess_tracker_response(int sockfd)
    }
    strncpy(tmp,rcvline,17);
    
-   if(strncmp(tmp,"HTTP/1.0 200 OK\r\n",strlen("HTTP/1.0 200 OK\r\n")))
+   if(strncmp(tmp,"HTTP/1.1 200 OK\r\n",strlen("HTTP/1.1 200 OK\r\n")))
    {
      perror("Error, didn't match HTTP line");
      exit(-6);
    }
    memset(rcvline,0xFF,MAXLINE);
    memset(tmp,0x0,MAXLINE);
-   // Content-Length
-   len = recv(sockfd,rcvline,16,0);
+   // Content-Type
+   len = recv(sockfd,rcvline,26,0);
    if(len <= 0)
    {
      perror("Error, cannot read socket from tracker");
      exit(-6);
    }
-   strncpy(tmp,rcvline,16);
-   if(strncmp(tmp,"Content-Length: ",strlen("Content-Length: ")))
+   strncpy(tmp,rcvline,26);
+   if(strncmp(tmp,"Content-Type: text/plain\r\n",strlen("Content-Type: text/plain\r\n")))
    {
+     perror("Error, didn't match Content-Type line");
+     exit(-6);
+   }
+   memset(rcvline,0xFF,MAXLINE);
+   memset(tmp,0x0,MAXLINE);
+   // Content-Length
+   len = recv(sockfd,rcvline,15,0);
+   if(len <= 0)
+   {
+     perror("Error, cannot read socket from tracker");
+     exit(-6);
+   }
+   strncpy(tmp,rcvline,15);
+   if(strncmp(tmp,"Content-Length:",strlen("Content-Length:")))
+   {
+     printf("tmp   :%s|len:%ld\n",tmp, strlen(tmp));
+     printf("should:%s|len:%ld\n", "Content-Length:", strlen("Content-Length:"));
      perror("Error, didn't match Content-Length line");
      exit(-6);
    }
@@ -72,19 +89,6 @@ tracker_response* preprocess_tracker_response(int sockfd)
    //printf("NUMBER RECEIVED: %d\n",datasize);
    memset(rcvline,0xFF,MAXLINE);
    memset(num,0x0,MAXLINE);
-   // 读取Content-type和Pragma行
-   len = recv(sockfd,rcvline,26,0);
-   if(len <= 0)
-   {
-     perror("Error, cannot read socket from tracker");
-     exit(-6);
-   }
-   len = recv(sockfd,rcvline,18,0);
-   if(len <= 0)
-   {
-     perror("Error, cannot read socket from tracker");
-     exit(-6);
-   }
    // 去除响应中额外的\r\n空行
    len = recv(sockfd,rcvline,2,0);
    if(len <= 0)
@@ -131,6 +135,7 @@ tracker_data* get_tracker_data(char* data, int len)
   tracker_data* ret;
   be_node* ben_res;
   ben_res = be_decoden(data,len);
+
   if(ben_res->type != BE_DICT)
   {
     perror("Data not of type dict");
@@ -146,9 +151,9 @@ tracker_data* get_tracker_data(char* data, int len)
 
   // 遍历键并测试它们
   int i;
-  for (i=0; ben_res->val.d[i].val != NULL; i++)
-  { 
-    //printf("%s\n",ben_res->val.d[i].key);
+  for (i=0; i < ben_res->len; i++)
+  {
+    // printf("%s\n",ben_res->val.d[i].key);
     // 检查是否有失败键
     if(!strncmp(ben_res->val.d[i].key,"failure reason",strlen("failure reason")))
     {
@@ -167,7 +172,7 @@ tracker_data* get_tracker_data(char* data, int len)
       get_peers(ret,peer_list);
     }
   }
- 
+
   be_free(ben_res);
 
   return ret;
@@ -176,23 +181,9 @@ tracker_data* get_tracker_data(char* data, int len)
 void get_peers(tracker_data* td, be_node* peer_list)
 {
   int i;
-  int numpeers = 0;
+  int numpeers = strlen(peer_list->val.s) / 6;
 
-  // 计算列表中的peer数
-  for (i=0; peer_list->val.l[i] != NULL; i++)
-  {
-    // 确认元素是一个字典
-    if(peer_list->val.l[i]->type != BE_DICT)
-    {
-      perror("Expecting dict, got something else");
-      exit(-12);
-    }
-
-    // 找到一个peer, 增加numpeers
-    numpeers++;
-  }
-
-  printf("Num peers: %d\n",numpeers);
+  // printf("Num peers: %d\n",numpeers);
 
   // 为peer分配空间
   td->numpeers = numpeers;
@@ -204,13 +195,21 @@ void get_peers(tracker_data* td, be_node* peer_list)
   }
 
   // 获取每个peer的数据
-  for (i=0; peer_list->val.l[i] != NULL; i++)
+  for (i=0; i < numpeers; i++)
   {
-    get_peer_data(&(td->peers[i]),peer_list->val.l[i]);
+    // 填充ip
+    char ip[4], port[2], portstr[6];
+    strncpy(ip,peer_list->val.s + (i * 6), 4);
+    td->peers[i].ip = (char *)malloc(16 * sizeof(char));
+    sprintf(td->peers[i].ip, "%d.%d.%d.%d", ip[0] & 0xff, ip[1] & 0xff, ip[2] & 0xff, ip[3] & 0xff);
+    // 填充端口
+    strncpy(port,peer_list->val.s + (i * 6) + 4, 2);
+    sprintf(portstr, "%d", (port[0] & 0xff) << 8 | (port[1] & 0xff));
+    td->peers[i].port = atoi(portstr);
+    // 打印peer数据
+    // printf("Peer %d: %s:%d\n",i,td->peers[i].ip,td->peers[i].port);
   }
-
   return;
-
 }
 
 // 给出一个peerdata的指针和一个peer的字典数据, 填充peerdata结构

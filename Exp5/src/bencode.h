@@ -33,6 +33,7 @@ typedef struct be_dict {
 
 typedef struct be_node {
 	be_type type;
+	int len;      //字典或列表的长度
 	union {
 		char *s;
 		long long i;

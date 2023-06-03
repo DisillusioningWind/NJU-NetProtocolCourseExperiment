@@ -96,6 +96,7 @@ static be_node *_be_decode(const char **data, long long *data_len)
 			++(*data);
 
 			ret->val.l[i] = NULL;
+			ret->len = i;
 
 			return ret;
 		}
@@ -118,6 +119,7 @@ static be_node *_be_decode(const char **data, long long *data_len)
 			++(*data);
 
 			ret->val.d[i].val = NULL;
+			ret->len = i;
 
 			return ret;
 		}
@@ -142,6 +144,7 @@ static be_node *_be_decode(const char **data, long long *data_len)
 			ret = be_alloc(BE_STR);
 
 			ret->val.s = _be_decode_str(data, data_len);
+			// ret->len = data_len;
 
 			return ret;
 		}
