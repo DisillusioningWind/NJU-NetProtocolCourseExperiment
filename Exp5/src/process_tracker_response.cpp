@@ -168,7 +168,8 @@ tracker_data* get_tracker_data(char* data, int len)
     // peers键
     if(!strncmp(ben_res->val.d[i].key,"peers",strlen("peers")))
     { 
-      be_node* peer_list = ben_res->val.d[i].val;
+      // printf("node type:%d\n", ben_res->val.d[i].val->type);
+      be_node *peer_list = ben_res->val.d[i].val;
       get_peers(ret,peer_list);
     }
   }
@@ -177,7 +178,7 @@ tracker_data* get_tracker_data(char* data, int len)
 
   return ret;
 }
-// 处理来自Tracker的字典模式的peer列表
+// 处理来自Tracker的二进制模式的peer列表
 void get_peers(tracker_data* td, be_node* peer_list)
 {
   int i;
@@ -197,15 +198,16 @@ void get_peers(tracker_data* td, be_node* peer_list)
   // 获取每个peer的数据
   for (i=0; i < numpeers; i++)
   {
-    // 填充ip
-    char ip[4], port[2], portstr[6];
-    strncpy(ip,peer_list->val.s + (i * 6), 4);
-    td->peers[i].ip = (char *)malloc(16 * sizeof(char));
-    sprintf(td->peers[i].ip, "%d.%d.%d.%d", ip[0] & 0xff, ip[1] & 0xff, ip[2] & 0xff, ip[3] & 0xff);
-    // 填充端口
-    strncpy(port,peer_list->val.s + (i * 6) + 4, 2);
+    // 格式化
+    char ip[4], ipstr[16], port[2], portstr[6];
+    strncpy(ip, peer_list->val.s + (i * 6), 4);
+    strncpy(port, peer_list->val.s + (i * 6) + 4, 2);
+    sprintf(ipstr, "%d.%d.%d.%d", ip[0] & 0xff, ip[1] & 0xff, ip[2] & 0xff, ip[3] & 0xff);
     sprintf(portstr, "%d", (port[0] & 0xff) << 8 | (port[1] & 0xff));
+    // 填充ip和端口
+    td->peers[i].ip = (char *)malloc(16 * sizeof(char));
     td->peers[i].port = atoi(portstr);
+    strcpy(td->peers[i].ip, ipstr);
     // 打印peer数据
     // printf("Peer %d: %s:%d\n",i,td->peers[i].ip,td->peers[i].port);
   }

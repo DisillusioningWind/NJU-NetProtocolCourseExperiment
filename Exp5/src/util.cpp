@@ -109,7 +109,7 @@ int recvline(int fd, char **line)
     if (lineIndex > lineSize)
     {
       lineSize *= 2;
-      char *newLine = realloc(*line, sizeof(char) * lineSize);
+      char *newLine = (char *)realloc(*line, sizeof(char) * lineSize);
       
       if (newLine == NULL)
       {

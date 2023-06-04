@@ -1,18 +1,18 @@
 
-CC=gcc
-CFLAGS= -std=c99 -g
+CC=g++
+CFLAGS= -std=c++11 -g
 LIBS= -lpthread
 TARGET=simpletorrent
-SOURCES=src/util.c \
-        src/bencode.c \
-				src/sha1.c \
-				src/shutdown.c \
-				src/make_tracker_request.c \
-				src/parse_announce_url.c \
-        src/parsetorretnfile.c \
-				src/process_tracker_response.c \
-				src/simpletorrent.c \
-		src/pwp.c
+SOURCES=src/util.cpp \
+        src/bencode.cpp \
+				src/sha1.cpp \
+				src/shutdown.cpp \
+				src/make_tracker_request.cpp \
+				src/parse_announce_url.cpp \
+        src/parsetorretnfile.cpp \
+				src/process_tracker_response.cpp \
+				src/simpletorrent.cpp \
+		src/pwp.cpp
 
 OBJS=src/util.o \
      src/bencode.o \

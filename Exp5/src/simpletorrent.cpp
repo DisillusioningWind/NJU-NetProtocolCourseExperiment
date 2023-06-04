@@ -3,7 +3,7 @@
 #include <netinet/in.h> 
 #include <arpa/inet.h>
 #include <netinet/in.h>
-#include <signal.h>
+#include <csignal>
 #include <pthread.h>
 #include <time.h>
 #include "util.h"
@@ -13,11 +13,33 @@
 
 //#define MAXLINE 4096 
 // pthread数据
+char g_my_ip[128]; // 格式为XXX.XXX.XXX.XXX, null终止
+int g_peerport;    // peer监听的端口号
+int g_infohash[5]; // 要共享或要下载的文件的SHA1哈希值, 每个客户端同时只能处理一个文件
+char g_my_id[20];
+
+int g_done; // 表明程序是否应该终止
+
+torrentmetadata_t *g_torrentmeta;
+char *g_filedata; // 文件的实际数据
+int g_filelen;
+int g_num_pieces;
+char *g_filename;
+
+char g_tracker_ip[16]; // tracker的IP地址, 格式为XXX.XXX.XXX.XXX(null终止)
+int g_tracker_port;
+tracker_data *g_tracker_response;
+
+// 这些变量用在函数make_tracker_request中, 它们需要在客户端执行过程中不断更新.
+int g_uploaded;
+int g_downloaded;
+int g_left;
 
 void init()
 {
   g_done = 0;
   g_tracker_response = NULL;
+  g_peerport = 2706;
 }
 
 int main(int argc, char **argv) 
@@ -93,8 +115,8 @@ int main(int argc, char **argv)
   signal(SIGINT,client_shutdown);
 
   // 设置监听peer的线程
-  pthread_t listen_thread;
-  pthread_create(&listen_thread, NULL, pwp_thread, NULL);
+  // pthread_t listen_thread;
+  // pthread_create(&listen_thread, NULL, pwp_thread, NULL);
 
   // 定期联系Tracker服务器
   int firsttime = 1;

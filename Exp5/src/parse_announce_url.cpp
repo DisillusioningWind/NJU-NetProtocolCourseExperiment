@@ -51,3 +51,28 @@ announce_url_t* parse_announce_url(char* announce)
 
   return ret;
 }
+
+std::string SHA1toStr(unsigned int SHA1[5])
+{
+  std::string ret;
+  char buf[9];
+  for(int i=0; i<5; i++)
+  {
+    sprintf(buf,"%08x",SHA1[i]);
+    ret += buf;
+  }
+  return ret;
+}
+
+std::vector<std::string> splitSHA1Str(char *SHA1str, int num_pieces)
+{
+  std::vector<std::string> ret;
+  char buf[21];
+  for(int i=0; i<num_pieces; i++)
+  {
+    strncpy(buf, SHA1str + i * 20, 20);
+    buf[20] = '\0';
+    ret.push_back(buf);
+  }
+  return ret;
+}

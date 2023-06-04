@@ -6,14 +6,16 @@
  */
 
 #include <stdlib.h> /* malloc() realloc() free() strtoll() */
+#include <stdio.h> /* sprintf() */
 #include <string.h> /* memset() */
 
 #include "bencode.h"
 
 static be_node *be_alloc(be_type type)
 {
-	be_node *ret = malloc(sizeof(*ret));
-	if (ret) {
+	be_node *ret = (be_node *)malloc(sizeof(*ret));
+	if (ret)
+	{
 		memset(ret, 0x00, sizeof(*ret));
 		ret->type = type;
 	}
@@ -62,7 +64,7 @@ static char *_be_decode_str(const char **data, long long *data_len, int *str_len
 	len = slen;
 
 	if (**data == ':') {
-		char *_ret = malloc(sizeof(sllen) + len + 1);
+		char *_ret = (char *)malloc(sizeof(sllen) + len + 1);
 		memcpy(_ret, &sllen, sizeof(sllen));
 		ret = _ret + sizeof(sllen);
 		memcpy(ret, *data + 1, len);
@@ -90,7 +92,7 @@ static be_node *_be_decode(const char **data, long long *data_len)
 			--(*data_len);
 			++(*data);
 			while (**data != 'e') {
-				ret->val.l = realloc(ret->val.l, (i + 2) * sizeof(*ret->val.l));
+				ret->val.l = (be_node **)realloc(ret->val.l, (i + 2) * sizeof(*ret->val.l));
 				ret->val.l[i] = _be_decode(data, data_len);
 				++i;
 			}
@@ -113,7 +115,7 @@ static be_node *_be_decode(const char **data, long long *data_len)
 			--(*data_len);
 			++(*data);
 			while (**data != 'e') {
-				ret->val.d = realloc(ret->val.d, (i + 2) * sizeof(*ret->val.d));
+				ret->val.d = (be_dict *)realloc(ret->val.d, (i + 2) * sizeof(*ret->val.d));
 				ret->val.d[i].key = _be_decode_str(data, data_len, &slen);
 				ret->val.d[i].val = _be_decode(data, data_len);
 				++i;

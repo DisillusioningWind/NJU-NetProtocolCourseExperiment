@@ -1,0 +1,1 @@
+./bin/simpletorrent ./torrents/testfile.torrent 192.168.126.136 ./data/testfile.txt 0
